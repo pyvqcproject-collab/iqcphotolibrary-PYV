@@ -1,0 +1,28 @@
+{
+  "entities": {
+    "QCReport": {
+      "title": "QC Report",
+      "description": "A quality control report for a product.",
+      "type": "object",
+      "properties": {
+        "date": { "type": "string", "description": "Date of the report" },
+        "floor": { "type": "string", "description": "Floor number or name" },
+        "order": { "type": "string", "description": "Order code" },
+        "colorCode": { "type": "string", "description": "Color code" },
+        "errorName": { "type": "string", "description": "Name of the error" },
+        "supplier": { "type": "string", "description": "Supplier name" },
+        "imageUrls": { "type": "array", "description": "List of compressed image URLs" },
+        "employeeId": { "type": "string", "description": "Employee ID who created this report" },
+        "employeeEmail": { "type": "string", "description": "Employee Email" },
+        "createdAt": { "type": "timestamp" }
+      },
+      "required": ["date", "floor", "order", "colorCode", "errorName", "supplier", "imageUrls", "employeeId", "employeeEmail", "createdAt"]
+    }
+  },
+  "firestore": {
+    "qc_reports/{reportId}": {
+      "schema": { "$ref": "#/entities/QCReport" },
+      "description": "Collection of QC reports"
+    }
+  }
+}

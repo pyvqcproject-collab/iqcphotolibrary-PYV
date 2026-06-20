@@ -1,0 +1,6 @@
+{
+  "name": "QC Core",
+  "description": "Hệ thống báo cáo chất lượng QC và lưu trữ ảnh minh chứng",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

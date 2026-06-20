@@ -1,0 +1,83 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isValidId(id) {
+      return id is string && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    function incoming() {
+      return request.resource.data;
+    }
+
+    function existing() {
+      return resource.data;
+    }
+
+    function isAdmin() {
+      return isSignedIn() && (request.auth.token.email == 'pyvqcproject@gmail.com' || request.auth.token.email.matches('.*admin.*'));
+    }
+
+    function isValidQCReport(data) {
+      return data.keys().hasAll(['date', 'floor', 'order', 'colorCode', 'errorName', 'supplier', 'imageUrls', 'employeeId', 'employeeEmail', 'createdAt'])
+        && data.date is string
+        && data.floor is string
+        && data.order is string
+        && data.colorCode is string
+        && data.errorName is string
+        && data.supplier is string
+        && data.imageUrls is list
+        && data.employeeId is string
+        && data.employeeEmail is string
+        && data.createdAt != null;
+    }
+
+    match /test_connections/{docId} {
+      allow read, write: if true;
+    }
+
+    match /qc_reports/{reportId} {
+      // allow read to the owner or admins
+      allow get: if isSignedIn() && isValidId(reportId) && (existing().employeeEmail == request.auth.token.email || isAdmin());
+      allow list: if isSignedIn() && (resource.data.employeeEmail == request.auth.token.email || isAdmin());
+
+      // allow creation if the payload perfectly matches schema
+      allow create: if isSignedIn() && isValidId(reportId) && isValidQCReport(incoming());
+      
+      // Updates are allowed for the owner or admins
+      allow update: if isSignedIn() && ((existing().employeeEmail == request.auth.token.email && isValidQCReport(incoming())) || isAdmin());
+      
+      // Deletes are allowed for the owner or admins
+      allow delete: if isSignedIn() && (existing().employeeEmail == request.auth.token.email || isAdmin());
+    }
+
+    match /settings/{settingId} {
+      allow read: if isSignedIn();
+      allow write: if isAdmin();
+    }
+
+    match /qc_users/{email} {
+      // Allow any signed in user to read their or other's user setup
+      allow read: if isSignedIn();
+      // Only admins can modify user setup
+      allow write: if isAdmin();
+    }
+
+    match /po_color_mappings/{orderId} {
+      allow read: if isSignedIn();
+      allow write: if isAdmin();
+    }
+
+    match /po_color_mappings_chunks/{chunkId} {
+      allow read: if isSignedIn();
+      allow write: if isAdmin();
+    }
+  }
+}

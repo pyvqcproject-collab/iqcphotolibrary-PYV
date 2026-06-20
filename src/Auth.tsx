@@ -33,9 +33,11 @@ export function Auth({ onSignIn }: AuthProps) {
       } else if (err.code === 'auth/popup-blocked') {
         errorMsg = 'Trình duyệt của bạn đã chặn cửa sổ đăng nhập. Vui lòng cho phép ứng dụng mở pop-up.';
       } else if (err.code === 'auth/network-request-failed') {
-        errorMsg = 'Lỗi mạng hoặc bị trình duyệt chặn (do chạy trong khung xem trước). Vui lòng nhấn biểu tượng ↗ (mở trong thẻ mới) ở góc phải trên cùng và thử đăng nhập lại.';
+        errorMsg = 'Lỗi mạng hoặc bị trình duyệt chặn. Vui lòng thử đăng nhập lại.';
+      } else if (err.code === 'auth/missing-initial-state' || (err.message && err.message.includes('SAML SSO')) || (err.message && err.message.includes('sessionStorage'))) {
+        errorMsg = 'Trình duyệt của bạn đang chặn lưu trữ tạm thời (sessionStorage) hoặc bạn đang chạy trong AI Studio trên điện thoại. Vui lòng bấm vào nút "Mở thẻ mới" (↗) ở góc trên cùng để mở web ngoài Iframe và thử lại.';
       } else if (err.message) {
-        errorMsg = `Lỗi: ${err.message}`;
+        errorMsg = `Lỗi: ${err.message}. Vui lòng thử mở thẻ mới trên trình duyệt (nút ↗).`;
       }
       
       setError(errorMsg);

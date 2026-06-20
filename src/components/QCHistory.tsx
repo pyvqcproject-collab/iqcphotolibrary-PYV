@@ -1412,7 +1412,7 @@ export const QCHistory = React.memo(function QCHistory({ user, token, userProfil
       <div className={`w-full lg:w-1/3 min-h-0 lg:min-w-[420px] lg:max-w-[480px] flex-col h-auto md:h-full lg:gap-5 ${selectedReport ? 'flex' : 'hidden'}`}>
         
         {/* Selected Details Drawer Pane */}
-        <div className={`bg-white rounded-xl border border-slate-200 shadow-sm flex flex-col overflow-hidden flex-1 min-h-[450px] lg:min-h-0 pb-16 lg:pb-0 ${selectedReport ? 'flex' : 'hidden'}`}>
+        <div className={`bg-white rounded-xl border border-slate-200 shadow-sm flex flex-col overflow-visible lg:overflow-hidden flex-1 min-h-[450px] lg:min-h-0 pb-16 lg:pb-0 ${selectedReport ? 'flex' : 'hidden'}`}>
           {selectedReport ? (
             <div className="h-full flex flex-col">
               {/* Header Title */}
@@ -1436,7 +1436,7 @@ export const QCHistory = React.memo(function QCHistory({ user, token, userProfil
               </div>
 
               {/* Informative Body */}
-              <div className="flex-1 overflow-y-auto p-5 space-y-5">
+              <div className="flex-1 overflow-visible lg:overflow-y-auto p-5 space-y-5">
                 {/* Admin/User Error Notification */}
                 {adminActionError && (
                   <div className="rounded-lg bg-red-50 p-3.5 border border-red-200 text-xs text-red-800 font-semibold leading-relaxed flex items-start gap-2.5 shadow-sm animate-in fade-in duration-200">

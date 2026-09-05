@@ -13,6 +13,7 @@ import {
   getDoc
 } from 'firebase/firestore';
 import { 
+  ChevronDown,
   Users, 
   Sliders, 
   Plus, 
@@ -38,7 +39,8 @@ export interface QCUser {
   floorGroup: string;
   permittedFloors: string[];
   role?: 'admin' | 'user';
-  part?: 'ĐẾ' | 'MẶT GIÀY' | '';
+  part?: 'ĐẾ THÔ' | 'ĐẾ PHUN SƠN' | 'MẶT GIÀY' | '';
+  parts?: string[];
 }
 
 export interface POMapping {
@@ -113,11 +115,12 @@ export const AdminPanel = React.memo(function AdminPanel({ onMappingChange }: Ad
   const [adminSuccess, setAdminSuccess] = useState('');
 
   // App Config States
-  const [configPartTab, setConfigPartTab] = useState<'de' | 'matgiay'>('de');
+  const [configPartTab, setConfigPartTab] = useState<'detho' | 'deson' | 'matgiay'>('detho');
   const [fullAppConfig, setFullAppConfig] = useState<any>({});
   const [appFloorsStr, setAppFloorsStr] = useState('');
   const [appErrorsStr, setAppErrorsStr] = useState('');
   const [appSuppliersStr, setAppSuppliersStr] = useState('');
+  const [appColorsStr, setAppColorsStr] = useState('');
   const [isSavingAppConfig, setIsSavingAppConfig] = useState(false);
   const [loadingAppConfig, setLoadingAppConfig] = useState(true);
 
@@ -128,7 +131,9 @@ export const AdminPanel = React.memo(function AdminPanel({ onMappingChange }: Ad
   const [userFloorGroup, setUserFloorGroup] = useState('K73F');
   const [userPermittedFloorsStr, setUserPermittedFloorsStr] = useState('K73A, K73B, K73C, K73D');
   const [userRole, setUserRole] = useState<'admin' | 'user'>('user');
-  const [userPart, setUserPart] = useState<'ĐẾ' | 'MẶT GIÀY' | ''>('');
+  const [userPart, setUserPart] = useState<'ĐẾ THÔ' | 'ĐẾ PHUN SƠN' | 'MẶT GIÀY' | ''>('');
+  const [userParts, setUserParts] = useState<string[]>([]);
+  const [partDropdownOpen, setPartDropdownOpen] = useState(false);
   const [editingEmail, setEditingEmail] = useState<string | null>(null);
   const [isSavingUser, setIsSavingUser] = useState(false);
 
@@ -377,10 +382,11 @@ export const AdminPanel = React.memo(function AdminPanel({ onMappingChange }: Ad
       }
       
       setFullAppConfig(configData);
-      const currentData = configData['de'] || configData;
+      const currentData = configData['detho'] || configData['de'] || configData;
       setAppFloorsStr((currentData.floors || []).join(', '));
       setAppErrorsStr((currentData.errors || []).join(', '));
       setAppSuppliersStr((currentData.suppliers || []).join(', '));
+      setAppColorsStr((currentData.colors || []).join('\n'));
       
       if (Object.keys(configData).length > 0) {
         localStorage.setItem('local_app_config', JSON.stringify(configData));
@@ -418,14 +424,15 @@ export const AdminPanel = React.memo(function AdminPanel({ onMappingChange }: Ad
     fetchAppConfig();
   }, []);
 
-  const handleConfigTabChange = (newTab: 'de' | 'matgiay') => {
+  const handleConfigTabChange = (newTab: 'detho' | 'deson' | 'matgiay') => {
     // Save current strings to memory
     const updatedConfig = {
       ...fullAppConfig,
       [configPartTab]: {
         floors: appFloorsStr.split(',').map(s => s.trim().toUpperCase()).filter(s => s.length > 0),
         errors: appErrorsStr.split(',').map(s => s.trim()).filter(s => s.length > 0),
-        suppliers: appSuppliersStr.split(',').map(s => s.trim()).filter(s => s.length > 0)
+        suppliers: appSuppliersStr.split(',').map(s => s.trim()).filter(s => s.length > 0),
+        colors: appColorsStr.split('\n').map(s => s.trim()).filter(s => s.length > 0)
       }
     };
     setFullAppConfig(updatedConfig);
@@ -435,6 +442,7 @@ export const AdminPanel = React.memo(function AdminPanel({ onMappingChange }: Ad
     setAppFloorsStr((newData.floors || []).join(', '));
     setAppErrorsStr((newData.errors || []).join(', '));
     setAppSuppliersStr((newData.suppliers || []).join(', '));
+    setAppColorsStr((newData.colors || []).join('\n'));
     
     setConfigPartTab(newTab);
   };
@@ -450,13 +458,15 @@ export const AdminPanel = React.memo(function AdminPanel({ onMappingChange }: Ad
       const parsedFloors = appFloorsStr.split(',').map(s => s.trim().toUpperCase()).filter(s => s.length > 0);
       const parsedErrors = appErrorsStr.split(',').map(s => s.trim()).filter(s => s.length > 0);
       const parsedSuppliers = appSuppliersStr.split(',').map(s => s.trim()).filter(s => s.length > 0);
+      const parsedColors = appColorsStr.split('\n').map(s => s.trim()).filter(s => s.length > 0);
 
       const finalConfigToSave = {
         ...fullAppConfig,
         [configPartTab]: {
           floors: parsedFloors,
           errors: parsedErrors,
-          suppliers: parsedSuppliers
+          suppliers: parsedSuppliers,
+          colors: parsedColors
         }
       };
       
@@ -513,7 +523,8 @@ export const AdminPanel = React.memo(function AdminPanel({ onMappingChange }: Ad
         floorGroup: userFloorGroup.trim().toUpperCase(),
         permittedFloors: listFloors,
         role: userRole,
-        part: userPart || ''
+        part: userParts.length > 0 ? (userParts[0] as any) : '',
+        parts: userParts,
       };
 
       try {
@@ -571,6 +582,7 @@ export const AdminPanel = React.memo(function AdminPanel({ onMappingChange }: Ad
     setUserPermittedFloorsStr('K73A, K73B, K73C, K73D');
     setUserRole('user');
     setUserPart('');
+    setUserParts([]);
     setEditingEmail(null);
   };
 
@@ -582,6 +594,7 @@ export const AdminPanel = React.memo(function AdminPanel({ onMappingChange }: Ad
     setUserPermittedFloorsStr((u.permittedFloors || []).join(', '));
     setUserRole(u.role || 'user');
     setUserPart(u.part || '');
+    setUserParts(u.parts || (u.part ? [u.part] : []));
     setEditingEmail(u.email);
     setAdminError('');
     setAdminSuccess('');
@@ -1124,17 +1137,35 @@ export const AdminPanel = React.memo(function AdminPanel({ onMappingChange }: Ad
                     </select>
                   </div>
 
-                  <div className="space-y-1">
+                  <div className="space-y-1 relative">
                     <label className="font-bold text-slate-600 block uppercase tracking-wide">Bộ vị</label>
-                    <select
-                      value={userPart}
-                      onChange={(e) => setUserPart(e.target.value as 'ĐẾ' | 'MẶT GIÀY' | '')}
-                      className="w-full p-2.5 border border-slate-200 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none transition-all font-bold text-slate-800 bg-white"
+                    <div 
+                      onClick={() => setPartDropdownOpen(!partDropdownOpen)}
+                      className="w-full p-2.5 border border-slate-200 rounded-lg focus-within:ring-2 focus-within:ring-blue-500 outline-none transition-all font-bold text-slate-800 bg-white cursor-pointer flex justify-between items-center"
                     >
-                      <option value="">-- Không chỉ định --</option>
-                      <option value="ĐẾ">ĐẾ</option>
-                      <option value="MẶT GIÀY">MẶT GIÀY</option>
-                    </select>
+                      <span className="truncate pr-2">
+                        {userParts.length === 0 ? '-- Không chỉ định --' : userParts.join(', ')}
+                      </span>
+                      <ChevronDown className="h-4 w-4 text-slate-500 shrink-0" />
+                    </div>
+                    {partDropdownOpen && (
+                      <div className="absolute top-full left-0 mt-1 w-full bg-white border border-slate-200 rounded-lg shadow-lg z-50 overflow-hidden">
+                        {['ĐẾ THÔ', 'ĐẾ PHUN SƠN', 'MẶT GIÀY'].map(pt => (
+                          <label key={pt} className="flex items-center gap-3 p-3 hover:bg-slate-50 cursor-pointer border-b border-slate-100 last:border-0">
+                            <input
+                              type="checkbox"
+                              checked={userParts.includes(pt)}
+                              onChange={(e) => {
+                                if (e.target.checked) setUserParts([...userParts, pt]);
+                                else setUserParts(userParts.filter(p => p !== pt));
+                              }}
+                              className="rounded border-slate-300 text-blue-600 focus:ring-blue-500 w-4 h-4 cursor-pointer"
+                            />
+                            <span className="font-semibold text-slate-700 text-sm">{pt}</span>
+                          </label>
+                        ))}
+                      </div>
+                    )}
                   </div>
                 </div>
 
@@ -1225,7 +1256,15 @@ export const AdminPanel = React.memo(function AdminPanel({ onMappingChange }: Ad
                             </span>
                           </td>
                           <td className="p-3.5">
-                            {u.part ? (
+                            {u.parts && u.parts.length > 0 ? (
+                              <div className="flex flex-col gap-1">
+                                {u.parts.map(p => (
+                                  <span key={p} className="font-bold bg-indigo-50 text-indigo-700 px-2 py-0.5 rounded border border-indigo-100 text-[10px] uppercase w-max">
+                                    {p}
+                                  </span>
+                                ))}
+                              </div>
+                            ) : u.part ? (
                               <span className="font-bold bg-indigo-50 text-indigo-700 px-2 py-0.5 rounded border border-indigo-100 text-[10px] uppercase">
                                 {u.part}
                               </span>
@@ -1469,18 +1508,25 @@ export const AdminPanel = React.memo(function AdminPanel({ onMappingChange }: Ad
                   <Sliders className="h-4 w-4 text-orange-500" />
                   Quản lý danh sách dùng chung
                 </h3>
-                <div className="flex bg-slate-200/50 p-1 rounded-lg border border-slate-200">
+                <div className="flex bg-slate-200/50 p-1 rounded-lg border border-slate-200 overflow-x-auto whitespace-nowrap">
                   <button
                     type="button"
-                    onClick={() => handleConfigTabChange('de')}
-                    className={`flex-1 py-1.5 text-xs font-bold rounded-md transition-all ${configPartTab === 'de' ? 'bg-white text-blue-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
+                    onClick={() => handleConfigTabChange('detho')}
+                    className={`flex-1 px-2 py-1.5 text-xs font-bold rounded-md transition-all ${configPartTab === 'detho' ? 'bg-white text-blue-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
                   >
-                    BỘ VỊ: ĐẾ
+                    BỘ VỊ: ĐẾ THÔ
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => handleConfigTabChange('deson')}
+                    className={`flex-1 px-2 py-1.5 text-xs font-bold rounded-md transition-all ${configPartTab === 'deson' ? 'bg-white text-blue-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
+                  >
+                    BỘ VỊ: ĐẾ PHUN SƠN
                   </button>
                   <button
                     type="button"
                     onClick={() => handleConfigTabChange('matgiay')}
-                    className={`flex-1 py-1.5 text-xs font-bold rounded-md transition-all ${configPartTab === 'matgiay' ? 'bg-white text-blue-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
+                    className={`flex-1 px-2 py-1.5 text-xs font-bold rounded-md transition-all ${configPartTab === 'matgiay' ? 'bg-white text-blue-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
                   >
                     BỘ VỊ: MẶT GIÀY
                   </button>
@@ -1537,6 +1583,20 @@ export const AdminPanel = React.memo(function AdminPanel({ onMappingChange }: Ad
                     />
                   </div>
 
+                  <div className="space-y-1.5">
+                    <label className="font-bold text-slate-600 block uppercase tracking-wide flex justify-between">
+                      <span>Danh sách Mã màu & Xưởng tương ứng</span>
+                      <span className="text-[10px] text-blue-600">Mỗi mục 1 dòng (Mã Màu : Xưởng)</span>
+                    </label>
+                    <textarea
+                      rows={4}
+                      value={appColorsStr}
+                      onChange={(e) => setAppColorsStr(e.target.value)}
+                      className="w-full p-3 border border-slate-200 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none transition-all font-semibold text-slate-800 bg-slate-50 focus:bg-white"
+                      placeholder="VD:&#10;RED01: Xưởng A&#10;BLU02: Xưởng May 1"
+                    />
+                  </div>
+
                   <div className="pt-2 flex flex-col sm:flex-row justify-end gap-3">
                     <button
                       type="button"
@@ -1544,6 +1604,7 @@ export const AdminPanel = React.memo(function AdminPanel({ onMappingChange }: Ad
                         setAppFloorsStr('');
                         setAppSuppliersStr('');
                         setAppErrorsStr('');
+                        setAppColorsStr('');
                       }}
                       className="bg-slate-200 hover:bg-slate-300 text-slate-700 px-6 py-3 rounded-lg font-bold flex items-center justify-center gap-2 transition-all cursor-pointer w-full sm:w-auto"
                     >

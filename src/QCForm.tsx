@@ -106,6 +106,9 @@ export function QCForm({ user, token, onLogout }: QCFormProps) {
   const [supplierOption, setSupplierOption] = useState('');
   const [errorOption, setErrorOption] = useState('');
   const [customErrorInput, setCustomErrorInput] = useState('');
+  
+  const [colorOption, setColorOption] = useState('');
+  const [customColorInput, setCustomColorInput] = useState('');
 
   const [isSearchingColor, setIsSearchingColor] = useState(false);
 
@@ -134,6 +137,9 @@ export function QCForm({ user, token, onLogout }: QCFormProps) {
   // Supplier Options list (Xưởng cung ứng dropdown)
   const [supplierOptions, setSupplierOptions] = useState<string[]>(['JIA HOA', 'VĨNH TÀI', 'NỘI BỘ', 'KHÁC']);
 
+  // Colors config map list
+  const [colorConfigList, setColorConfigList] = useState<{ colorCode: string, supplier: string }[]>([]);
+
   const floorOptions = userProfile?.role === 'admin' 
     ? defaultFloors 
     : (userProfile?.permittedFloors && userProfile.permittedFloors.length > 0
@@ -146,12 +152,25 @@ export function QCForm({ user, token, onLogout }: QCFormProps) {
   // Admin capability check
   const isAdmin = userProfile?.role === 'admin' || (user.email || '').toLowerCase() === 'pyvqcproject@gmail.com' || (user.email || '').toLowerCase().includes('admin');
 
+  const parseColorsConfig = (colorsArray: string[]) => {
+    if (!colorsArray || !Array.isArray(colorsArray)) return [];
+    return colorsArray.map(str => {
+      const parts = str.split(':');
+      if (parts.length >= 2) {
+        return { colorCode: parts[0].trim(), supplier: parts.slice(1).join(':').trim() };
+      }
+      return { colorCode: str.trim(), supplier: '' };
+    }).filter(c => c.colorCode);
+  };
+
   const updatePartConfig = (partKey: string, fullConfigFromStorage: any) => {
     let targetPartConfig = fullConfigFromStorage; // fallback
     if (partKey === 'MẶT GIÀY') {
       targetPartConfig = fullConfigFromStorage['matgiay'] || fullConfigFromStorage;
-    } else if (partKey === 'ĐẾ' || fullConfigFromStorage['de']) {
-      targetPartConfig = fullConfigFromStorage['de'] || fullConfigFromStorage;
+    } else if (partKey === 'ĐẾ THÔ' || fullConfigFromStorage['detho']) {
+      targetPartConfig = fullConfigFromStorage['detho'] || fullConfigFromStorage['de'] || fullConfigFromStorage;
+    } else if (partKey === 'ĐẾ PHUN SƠN' || fullConfigFromStorage['deson']) {
+      targetPartConfig = fullConfigFromStorage['deson'] || fullConfigFromStorage['de'] || fullConfigFromStorage;
     }
 
     if (targetPartConfig.floors && Array.isArray(targetPartConfig.floors)) {
@@ -164,10 +183,13 @@ export function QCForm({ user, token, onLogout }: QCFormProps) {
     }
     if (targetPartConfig.errors && Array.isArray(targetPartConfig.errors)) setErrorOptions(targetPartConfig.errors);
     if (targetPartConfig.suppliers && Array.isArray(targetPartConfig.suppliers)) setSupplierOptions(targetPartConfig.suppliers);
+    if (targetPartConfig.colors && Array.isArray(targetPartConfig.colors)) {
+      setColorConfigList(parseColorsConfig(targetPartConfig.colors));
+    }
   };
 
-  const handleAdminPartChange = (newPart: string) => {
-    if (!userProfile || !isAdmin) return;
+  const handlePartChange = (newPart: string) => {
+    if (!userProfile) return;
     
     // Update local profile state
     const updatedProfile = { ...userProfile, part: newPart as QCUser['part'] };
@@ -217,18 +239,21 @@ export function QCForm({ user, token, onLogout }: QCFormProps) {
        if (localAppConfigStr) {
           const parsedConfigOrig = JSON.parse(localAppConfigStr);
           // Detect user part from cached state
-          let activePartKey = 'de';
+          let activePartKey = 'detho';
           let localUsersForPart: any = null;
           try { localUsersForPart = JSON.parse(localStorage.getItem('local_qc_users') || "[]"); } catch(e){}
           const cachedUserForPart = Array.isArray(localUsersForPart) ? localUsersForPart.find((u: any) => u.email.toLowerCase() === emailKey) : null;
           if (cachedUserForPart && cachedUserForPart.part === 'MẶT GIÀY') {
             activePartKey = 'matgiay';
+          } else if (cachedUserForPart && cachedUserForPart.part === 'ĐẾ PHUN SƠN') {
+            activePartKey = 'deson';
           }
           const parsed = parsedConfigOrig[activePartKey] || parsedConfigOrig;
           
           if (parsed.floors && parsed.floors.length) setDefaultFloors(parsed.floors);
           if (parsed.errors && parsed.errors.length) setErrorOptions(parsed.errors);
           if (parsed.suppliers && parsed.suppliers.length) setSupplierOptions(parsed.suppliers);
+          if (parsed.colors && parsed.colors.length) setColorConfigList(parseColorsConfig(parsed.colors));
        }
     } catch (e) {
        console.warn("Failed to load local cache", e);
@@ -342,13 +367,16 @@ export function QCForm({ user, token, onLogout }: QCFormProps) {
         let userPartContext = matched?.part || '';
         if (userPartContext === 'MẶT GIÀY') {
            targetPartConfig = fullConfig['matgiay'] || fullConfig;
-        } else if (userPartContext === 'ĐẾ' || fullConfig['de']) {
-           targetPartConfig = fullConfig['de'] || fullConfig;
+        } else if (userPartContext === 'ĐẾ THÔ' || fullConfig['detho']) {
+           targetPartConfig = fullConfig['detho'] || fullConfig['de'] || fullConfig;
+        } else if (userPartContext === 'ĐẾ PHUN SƠN' || fullConfig['deson']) {
+           targetPartConfig = fullConfig['deson'] || fullConfig['de'] || fullConfig;
         }
 
         if (targetPartConfig.floors && Array.isArray(targetPartConfig.floors)) setDefaultFloors(targetPartConfig.floors);
         if (targetPartConfig.errors && Array.isArray(targetPartConfig.errors)) setErrorOptions(targetPartConfig.errors);
         if (targetPartConfig.suppliers && Array.isArray(targetPartConfig.suppliers)) setSupplierOptions(targetPartConfig.suppliers);
+        if (targetPartConfig.colors && Array.isArray(targetPartConfig.colors)) setColorConfigList(parseColorsConfig(targetPartConfig.colors));
         
         localStorage.setItem('local_app_config', JSON.stringify(fullConfig));
       }
@@ -414,6 +442,7 @@ export function QCForm({ user, token, onLogout }: QCFormProps) {
           if (parsed.floors) setDefaultFloors(parsed.floors);
           if (parsed.errors) setErrorOptions(parsed.errors);
           if (parsed.suppliers) setSupplierOptions(parsed.suppliers);
+          if (parsed.colors) setColorConfigList(parseColorsConfig(parsed.colors));
         } catch(e) {}
       }
     }
@@ -475,6 +504,7 @@ export function QCForm({ user, token, onLogout }: QCFormProps) {
           if (parsed.floors) setDefaultFloors(parsed.floors);
           if (parsed.errors) setErrorOptions(parsed.errors);
           if (parsed.suppliers) setSupplierOptions(parsed.suppliers);
+          if (parsed.colors) setColorConfigList(parseColorsConfig(parsed.colors));
         } catch (e) {}
       }
     }
@@ -518,6 +548,32 @@ export function QCForm({ user, token, onLogout }: QCFormProps) {
       setColorCode(''); // Clear if not found
     }
   }, [order, globalMappingsMap]);
+
+  // Sync colorOption with colorCode when it changes externally
+  useEffect(() => {
+    if (!colorCode) {
+      setColorOption('');
+    } else {
+      const isMapped = colorConfigList.some(c => c.colorCode.toUpperCase() === colorCode.toUpperCase());
+      if (isMapped) {
+        // Find exact casing from map if possible
+        const exactItem = colorConfigList.find(c => c.colorCode.toUpperCase() === colorCode.toUpperCase());
+        setColorOption(exactItem ? exactItem.colorCode : colorCode);
+      } else {
+        setColorOption('CUSTOM');
+      }
+    }
+  }, [colorCode, colorConfigList]);
+
+  // Find supplier mapping when colorCode changes
+  useEffect(() => {
+    if (!colorCode) return;
+    const match = colorConfigList.find(c => c.colorCode.toUpperCase() === colorCode.toUpperCase());
+    if (match && match.supplier) {
+      setSupplierOption(match.supplier);
+      setSupplier(match.supplier);
+    }
+  }, [colorCode, colorConfigList]);
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files) {
@@ -895,17 +951,29 @@ export function QCForm({ user, token, onLogout }: QCFormProps) {
                 
                 <div className="flex flex-col gap-1 sm:gap-1.5 text-xs">
                   <label className="font-bold text-slate-600 uppercase tracking-wide flex items-center gap-1">
-                    Bộ Vị {!isAdmin && <Lock className="h-3 w-3 text-slate-400" />}
+                    Bộ Vị 
+                    {!isAdmin && (!userProfile?.parts || userProfile.parts.length <= 1) && <Lock className="h-3 w-3 text-slate-400" />}
                   </label>
                   {isAdmin ? (
                     <select
                       value={userProfile?.part || ''}
-                      onChange={(e) => handleAdminPartChange(e.target.value)}
+                      onChange={(e) => handlePartChange(e.target.value)}
                       className="px-3 py-2.5 sm:py-3 border border-slate-200 rounded-lg bg-orange-50 focus:bg-white focus:ring-2 focus:ring-blue-500 outline-none transition-all font-bold text-slate-800 text-sm w-full truncate"
                     >
                       <option value="">Chưa gán (Tất cả)</option>
-                      <option value="ĐẾ">ĐẾ</option>
+                      <option value="ĐẾ THÔ">ĐẾ THÔ</option>
+                      <option value="ĐẾ PHUN SƠN">ĐẾ PHUN SƠN</option>
                       <option value="MẶT GIÀY">MẶT GIÀY</option>
+                    </select>
+                  ) : userProfile?.parts && userProfile.parts.length > 1 ? (
+                    <select
+                      value={userProfile?.part || ''}
+                      onChange={(e) => handlePartChange(e.target.value)}
+                      className="px-3 py-2.5 sm:py-3 border border-slate-200 rounded-lg bg-blue-50 focus:bg-white focus:ring-2 focus:ring-blue-500 outline-none transition-all font-bold text-slate-800 text-sm w-full truncate"
+                    >
+                      {userProfile.parts.map(p => (
+                        <option key={p} value={p}>{p}</option>
+                      ))}
                     </select>
                   ) : (
                     <div className="px-3 py-2.5 sm:py-3 border border-slate-200 rounded-lg bg-slate-100 font-bold text-slate-500 text-sm select-none truncate h-full flex items-center">
@@ -1000,15 +1068,50 @@ export function QCForm({ user, token, onLogout }: QCFormProps) {
                       <Loader2 className="h-3 w-3 text-blue-500 animate-spin ml-1" />
                     )}
                   </label>
-                  <input 
-                    type="text" 
-                    id="colorCode" 
-                    required 
-                    placeholder="Nhập mã màu" 
-                    value={colorCode} 
-                    onChange={e => setColorCode(e.target.value)} 
-                    className="px-3 py-2.5 sm:py-3 border border-slate-200 rounded-lg bg-slate-50 focus:bg-white focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition-all font-semibold text-slate-800 uppercase text-sm" 
-                  />
+                  {colorConfigList.length > 0 ? (
+                    <>
+                      <select
+                        id="colorOption"
+                        required
+                        value={colorOption}
+                        onChange={e => {
+                          setColorOption(e.target.value);
+                          if (e.target.value !== 'CUSTOM' && e.target.value !== '') {
+                            setColorCode(e.target.value);
+                          } else if (e.target.value === 'CUSTOM') {
+                            setColorCode('');
+                          }
+                        }}
+                        className="px-3 py-2.5 sm:py-3 border border-slate-200 rounded-lg bg-slate-50 focus:bg-white focus:ring-2 focus:ring-blue-500 outline-none transition-all font-semibold text-slate-800 text-sm"
+                      >
+                        <option value="" disabled>-- Chọn mã màu --</option>
+                        {Array.from(new Set(colorConfigList.map(c => c.colorCode))).map(c => (
+                          <option key={c} value={c}>{c}</option>
+                        ))}
+                        <option value="CUSTOM">➕ Khác (Tự nhập)...</option>
+                      </select>
+                      {colorOption === 'CUSTOM' && (
+                        <input
+                          type="text"
+                          required
+                          placeholder="Nhập mã màu mới..."
+                          value={colorCode}
+                          onChange={e => setColorCode(e.target.value)}
+                          className="mt-1 px-3 py-2 border border-slate-300 rounded-lg bg-white focus:ring-2 focus:ring-orange-400 outline-none transition-all font-semibold text-slate-800 uppercase text-sm shadow-inner"
+                        />
+                      )}
+                    </>
+                  ) : (
+                    <input 
+                      type="text" 
+                      id="colorCode" 
+                      required 
+                      placeholder="Nhập mã màu" 
+                      value={colorCode} 
+                      onChange={e => setColorCode(e.target.value)} 
+                      className="px-3 py-2.5 sm:py-3 border border-slate-200 rounded-lg bg-slate-50 focus:bg-white focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition-all font-semibold text-slate-800 uppercase text-sm" 
+                    />
+                  )}
                 </div>
 
                 {/* XƯỞNG CUNG ỨNG: DROPDOWN CHOSEN */}

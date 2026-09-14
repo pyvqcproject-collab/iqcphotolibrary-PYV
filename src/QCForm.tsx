@@ -167,9 +167,9 @@ export function QCForm({ user, token, onLogout }: QCFormProps) {
     let targetPartConfig = fullConfigFromStorage; // fallback
     if (partKey === 'MẶT GIÀY') {
       targetPartConfig = fullConfigFromStorage['matgiay'] || fullConfigFromStorage;
-    } else if (partKey === 'ĐẾ THÔ' || fullConfigFromStorage['detho']) {
+    } else if (partKey === 'ĐẾ THÔ') {
       targetPartConfig = fullConfigFromStorage['detho'] || fullConfigFromStorage['de'] || fullConfigFromStorage;
-    } else if (partKey === 'ĐẾ PHUN SƠN' || fullConfigFromStorage['deson']) {
+    } else if (partKey === 'ĐẾ PHUN SƠN') {
       targetPartConfig = fullConfigFromStorage['deson'] || fullConfigFromStorage['de'] || fullConfigFromStorage;
     }
 
@@ -367,9 +367,9 @@ export function QCForm({ user, token, onLogout }: QCFormProps) {
         let userPartContext = matched?.part || '';
         if (userPartContext === 'MẶT GIÀY') {
            targetPartConfig = fullConfig['matgiay'] || fullConfig;
-        } else if (userPartContext === 'ĐẾ THÔ' || fullConfig['detho']) {
+        } else if (userPartContext === 'ĐẾ THÔ') {
            targetPartConfig = fullConfig['detho'] || fullConfig['de'] || fullConfig;
-        } else if (userPartContext === 'ĐẾ PHUN SƠN' || fullConfig['deson']) {
+        } else if (userPartContext === 'ĐẾ PHUN SƠN') {
            targetPartConfig = fullConfig['deson'] || fullConfig['de'] || fullConfig;
         }
 
@@ -841,7 +841,7 @@ export function QCForm({ user, token, onLogout }: QCFormProps) {
               </div>
             </div>
 
-            <span className="ml-3 text-xs opacity-50 border-l border-white/30 pl-3 hidden lg:inline-block">Hệ Thống Báo Cáo Chất Lượng</span>
+            <span className="ml-3 text-sm font-bold opacity-90 uppercase tracking-widest border-l border-white/30 pl-3 hidden lg:inline-block">HỆ THỐNG BÁO CÁO CHẤT LƯỢNG</span>
           </div>
 
           {/* Navigation Tabs */}

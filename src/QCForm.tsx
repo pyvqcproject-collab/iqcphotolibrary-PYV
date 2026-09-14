@@ -585,6 +585,24 @@ export function QCForm({ user, token, onLogout }: QCFormProps) {
     setFiles((prev) => prev.filter((_, i) => i !== index));
   };
 
+  // --- Mobile Scroll Hide Logic ---
+  const [isScrolling, setIsScrolling] = useState(false);
+  const scrollTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+
+  const handleScroll = () => {
+    setIsScrolling(true);
+    if (scrollTimeoutRef.current) clearTimeout(scrollTimeoutRef.current);
+    scrollTimeoutRef.current = setTimeout(() => {
+      setIsScrolling(false);
+    }, 400);
+  };
+
+  useEffect(() => {
+    return () => {
+      if (scrollTimeoutRef.current) clearTimeout(scrollTimeoutRef.current);
+    };
+  }, []);
+
   const handleLogout = () => {
     onLogout();
   };
@@ -822,7 +840,7 @@ export function QCForm({ user, token, onLogout }: QCFormProps) {
       ) : (
         <>
       {/* Header */}
-      <header className="bg-[#000080] text-white px-3 sm:px-6 h-16 flex items-center justify-between shadow-md shrink-0">
+      <header className={`bg-[#000080] text-white px-3 sm:px-6 h-16 flex items-center justify-between shadow-md shrink-0 transition-all duration-300 ${isScrolling ? '-mt-16 md:mt-0' : 'mt-0'}`}>
         <div className="flex items-center gap-3 sm:gap-6">
           <div className="flex items-center shrink-0">
             <div className="flex flex-col leading-tight">
@@ -902,7 +920,7 @@ export function QCForm({ user, token, onLogout }: QCFormProps) {
       </header>
 
       {/* Main Content */}
-      <main className={`flex-1 overflow-y-auto p-3 sm:p-4 lg:p-6 pb-[50vh] md:pb-6 bg-slate-50 ${activeTab === 'create' ? 'block' : 'hidden'}`}>
+      <main onScroll={handleScroll} className={`flex-1 overflow-y-auto p-3 sm:p-4 lg:p-6 pb-[50vh] md:pb-6 bg-slate-50 ${activeTab === 'create' ? 'block' : 'hidden'}`}>
         
         {/* User restrictions notification */}
           {userProfile?.role === 'admin' ? (
@@ -1301,18 +1319,18 @@ export function QCForm({ user, token, onLogout }: QCFormProps) {
           </form>
         </main>
 
-     <main className={`flex-1 overflow-y-auto md:overflow-hidden pb-[50vh] md:pb-0 bg-slate-50 ${activeTab === 'history' ? 'flex flex-col' : 'hidden'}`}>
+     <main onScroll={handleScroll} className={`flex-1 overflow-y-auto md:overflow-hidden pb-[50vh] md:pb-0 bg-slate-50 ${activeTab === 'history' ? 'flex flex-col' : 'hidden'}`}>
         <QCHistory user={user} token={token} userProfile={userProfile} onNavigateToCreate={handleNavigateToCreate} isActive={activeTab === 'history'} />
       </main>
 
       {isAdmin && (
-        <main className={`flex-1 overflow-y-auto md:overflow-hidden pb-[50vh] md:pb-0 bg-slate-50 ${activeTab === 'admin' ? 'flex flex-col' : 'hidden'}`}>
+        <main onScroll={handleScroll} className={`flex-1 overflow-y-auto md:overflow-hidden pb-[50vh] md:pb-0 bg-slate-50 ${activeTab === 'admin' ? 'flex flex-col' : 'hidden'}`}>
           <AdminPanel onMappingChange={loadConfiguration} />
         </main>
       )}
 
       {/* Mobile Bottom Tab Navigation */}
-      <nav className="md:hidden fixed bottom-0 inset-x-0 bg-[#000080] border-t border-white/10 pb-safe pt-2 px-4 flex justify-around items-center z-50 shadow-xl">
+      <nav className={`md:hidden fixed bottom-0 inset-x-0 bg-[#000080] border-t border-white/10 pb-safe pt-2 px-4 flex justify-around items-center z-50 shadow-xl transition-transform duration-300 transform ${isScrolling ? 'translate-y-full' : 'translate-y-0'}`}>
         <button
           type="button"
           onClick={() => setActiveTab('create')}

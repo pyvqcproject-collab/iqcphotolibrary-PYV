@@ -120,8 +120,7 @@ export const AdminPanel = React.memo(function AdminPanel({ onMappingChange }: Ad
   const [appFloorsStr, setAppFloorsStr] = useState('');
   const [appErrorsStr, setAppErrorsStr] = useState('');
   const [appSuppliersStr, setAppSuppliersStr] = useState('');
-  const [appColorsStr, setAppColorsStr] = useState('');
-  const [isSavingAppConfig, setIsSavingAppConfig] = useState(false);
+    const [isSavingAppConfig, setIsSavingAppConfig] = useState(false);
   const [loadingAppConfig, setLoadingAppConfig] = useState(true);
 
   // User form state
@@ -382,12 +381,11 @@ export const AdminPanel = React.memo(function AdminPanel({ onMappingChange }: Ad
       }
       
       setFullAppConfig(configData);
-      const currentData = configData['detho'] || configData['de'] || configData;
+      const currentData = configData[configPartTab] || configData['detho'] || configData['de'] || configData;
       setAppFloorsStr((currentData.floors || []).join(', '));
       setAppErrorsStr((currentData.errors || []).join(', '));
       setAppSuppliersStr((currentData.suppliers || []).join(', '));
-      setAppColorsStr((currentData.colors || []).join('\n'));
-      
+            
       if (Object.keys(configData).length > 0) {
         localStorage.setItem('local_app_config', JSON.stringify(configData));
       }
@@ -432,8 +430,7 @@ export const AdminPanel = React.memo(function AdminPanel({ onMappingChange }: Ad
         floors: appFloorsStr.split(',').map(s => s.trim().toUpperCase()).filter(s => s.length > 0),
         errors: appErrorsStr.split(',').map(s => s.trim()).filter(s => s.length > 0),
         suppliers: appSuppliersStr.split(',').map(s => s.trim()).filter(s => s.length > 0),
-        colors: appColorsStr.split('\n').map(s => s.trim()).filter(s => s.length > 0)
-      }
+              }
     };
     setFullAppConfig(updatedConfig);
     
@@ -442,8 +439,7 @@ export const AdminPanel = React.memo(function AdminPanel({ onMappingChange }: Ad
     setAppFloorsStr((newData.floors || []).join(', '));
     setAppErrorsStr((newData.errors || []).join(', '));
     setAppSuppliersStr((newData.suppliers || []).join(', '));
-    setAppColorsStr((newData.colors || []).join('\n'));
-    
+        
     setConfigPartTab(newTab);
   };
 
@@ -458,16 +454,14 @@ export const AdminPanel = React.memo(function AdminPanel({ onMappingChange }: Ad
       const parsedFloors = appFloorsStr.split(',').map(s => s.trim().toUpperCase()).filter(s => s.length > 0);
       const parsedErrors = appErrorsStr.split(',').map(s => s.trim()).filter(s => s.length > 0);
       const parsedSuppliers = appSuppliersStr.split(',').map(s => s.trim()).filter(s => s.length > 0);
-      const parsedColors = appColorsStr.split('\n').map(s => s.trim()).filter(s => s.length > 0);
-
+      
       const finalConfigToSave = {
         ...fullAppConfig,
         [configPartTab]: {
           floors: parsedFloors,
           errors: parsedErrors,
           suppliers: parsedSuppliers,
-          colors: parsedColors
-        }
+                  }
       };
       
       setFullAppConfig(finalConfigToSave);
@@ -1059,7 +1053,7 @@ export const AdminPanel = React.memo(function AdminPanel({ onMappingChange }: Ad
           </div>
         )}
 
-        {subTab === 'users' ? (
+        {subTab === 'users' && (
           /* MANAGING USER ACCOUNTS & FLOORS */
           <div className="max-w-6xl mx-auto grid grid-cols-1 lg:grid-cols-[380px_1fr] gap-6 items-start">
             
@@ -1325,7 +1319,8 @@ export const AdminPanel = React.memo(function AdminPanel({ onMappingChange }: Ad
             </div>
 
           </div>
-        ) : (
+        )}
+        {subTab === 'po_colors' && (
           /* MANAGING PO & COLORS DICTIONARY */
           <div className="max-w-6xl mx-auto grid grid-cols-1 lg:grid-cols-[400px_1fr] gap-6 items-start animate-in fade-in duration-200">
             
@@ -1583,19 +1578,7 @@ export const AdminPanel = React.memo(function AdminPanel({ onMappingChange }: Ad
                     />
                   </div>
 
-                  <div className="space-y-1.5">
-                    <label className="font-bold text-slate-600 block uppercase tracking-wide flex justify-between">
-                      <span>Danh sách Mã màu & Xưởng tương ứng</span>
-                      <span className="text-[10px] text-blue-600">Mỗi mục 1 dòng (Mã Màu : Xưởng)</span>
-                    </label>
-                    <textarea
-                      rows={4}
-                      value={appColorsStr}
-                      onChange={(e) => setAppColorsStr(e.target.value)}
-                      className="w-full p-3 border border-slate-200 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none transition-all font-semibold text-slate-800 bg-slate-50 focus:bg-white"
-                      placeholder="VD:&#10;RED01: Xưởng A&#10;BLU02: Xưởng May 1"
-                    />
-                  </div>
+
 
                   <div className="pt-2 flex flex-col sm:flex-row justify-end gap-3">
                     <button
@@ -1604,8 +1587,7 @@ export const AdminPanel = React.memo(function AdminPanel({ onMappingChange }: Ad
                         setAppFloorsStr('');
                         setAppSuppliersStr('');
                         setAppErrorsStr('');
-                        setAppColorsStr('');
-                      }}
+                                              }}
                       className="bg-slate-200 hover:bg-slate-300 text-slate-700 px-6 py-3 rounded-lg font-bold flex items-center justify-center gap-2 transition-all cursor-pointer w-full sm:w-auto"
                     >
                       <Trash2 className="h-4.5 w-4.5" />

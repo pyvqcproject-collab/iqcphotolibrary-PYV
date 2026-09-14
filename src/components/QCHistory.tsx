@@ -1083,36 +1083,140 @@ export const QCHistory = React.memo(function QCHistory({ user, token, userProfil
       
       {/* Left Column (Desktop 2/3) */}
       <div className={`flex-1 flex-col min-w-0 min-h-0 h-auto md:h-full ${selectedReport ? 'hidden lg:flex lg:w-2/3 lg:flex-none' : 'flex w-full'}`}>
-        {/* Grid Dashboard Header Info Cards */}
-        <div className="grid grid-cols-2 sm:grid-cols-3 gap-4 mb-5 shrink-0">
-        <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm flex flex-col justify-between">
-          <span className="text-xs font-semibold text-slate-400 uppercase tracking-widest">Tổng báo cáo</span>
-          <div className="flex items-baseline gap-2 mt-1">
-            <span className="text-2xl font-black text-slate-800">{reports.length}</span>
-            <span className="text-xs text-slate-500">tổng số</span>
-          </div>
-        </div>
+        {/* COMPACT TOOLBAR */}
+        <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-2 sm:p-3 mb-3 shrink-0 flex flex-col gap-2.5">
+          {/* ROW 1: Stats & Filters */}
+          <div className="flex flex-col xl:flex-row gap-2.5 items-start xl:items-center justify-between">
+            {/* Stats (Compact) */}
+            <div className="flex items-center flex-wrap gap-2 text-[11px] font-semibold w-full xl:w-auto">
+              <div className="flex items-center gap-1.5 bg-slate-50 border border-slate-200 px-2.5 py-1.5 rounded-lg flex-1 sm:flex-none justify-center">
+                <span className="text-slate-500 uppercase tracking-wider text-[9px]">Tổng:</span>
+                <span className="text-slate-800 text-sm">{reports.length}</span>
+              </div>
+              <div className="flex items-center gap-1.5 bg-emerald-50 border border-emerald-100 px-2.5 py-1.5 rounded-lg flex-1 sm:flex-none justify-center">
+                <span className="text-emerald-600/70 uppercase tracking-wider text-[9px]">Đồng bộ:</span>
+                <span className="text-emerald-700 text-sm">{reports.filter(r => !r.isLocalOnly).length}</span>
+              </div>
+              <div className="flex items-center gap-1.5 bg-amber-50 border border-amber-100 px-2.5 py-1.5 rounded-lg flex-1 sm:flex-none justify-center">
+                <span className="text-amber-600/70 uppercase tracking-wider text-[9px]">Lưu tạm:</span>
+                <span className="text-amber-600 text-sm">{reports.filter(r => r.isLocalOnly).length}</span>
+              </div>
+            </div>
 
-        <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm flex flex-col justify-between">
-          <span className="text-xs font-semibold text-slate-400 uppercase tracking-widest">Đã đồng bộ Cloud</span>
-          <div className="flex items-baseline gap-2 mt-1">
-            <span className="text-2xl font-black text-emerald-600">
-              {reports.filter(r => !r.isLocalOnly).length}
-            </span>
-            <span className="text-xs text-slate-500">an toàn</span>
-          </div>
-        </div>
+            {/* Filters */}
+            <div className="flex flex-wrap items-center gap-2 w-full xl:w-auto">
+              <select
+                value={selectedFloor}
+                onChange={e => setSelectedFloor(e.target.value)}
+                className="h-[30px] px-2 border border-slate-200 rounded-md text-[11px] bg-slate-50 outline-none focus:ring-1 focus:ring-blue-500 font-medium text-slate-700 flex-1 min-w-[110px]"
+              >
+                <option value="all">Tất cả khu vực</option>
+                {uniqueFloors.map(floor => (
+                  <option key={floor} value={floor}>{floor}</option>
+                ))}
+              </select>
+              
+              <select
+                value={selectedSupplier}
+                onChange={e => setSelectedSupplier(e.target.value)}
+                className="h-[30px] px-2 border border-slate-200 rounded-md text-[11px] bg-slate-50 outline-none focus:ring-1 focus:ring-blue-500 font-medium text-slate-700 flex-1 min-w-[110px]"
+              >
+                <option value="all">Tất cả xưởng</option>
+                {uniqueSuppliers.map(sup => (
+                  <option key={sup} value={sup}>{sup}</option>
+                ))}
+              </select>
 
-        <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm flex flex-col justify-between">
-          <span className="text-xs font-semibold text-slate-400 uppercase tracking-widest">Lưu tạm ngoại tuyến</span>
-          <div className="flex items-baseline gap-2 mt-1">
-            <span className="text-2xl font-black text-amber-500">
-              {reports.filter(r => r.isLocalOnly).length}
-            </span>
-            <span className="text-xs text-slate-500">trên máy</span>
+              <select
+                value={selectedStatus}
+                onChange={e => setSelectedStatus(e.target.value)}
+                className="h-[30px] px-2 border border-slate-200 rounded-md text-[11px] bg-slate-50 outline-none focus:ring-1 focus:ring-blue-500 font-medium text-slate-700 flex-1 min-w-[110px]"
+              >
+                <option value="all">Tất cả trạng thái</option>
+                <option value="synced">Đã đồng bộ mây</option>
+                <option value="offline">Lưu tạm offline</option>
+              </select>
+
+              <div className="flex items-center gap-1 h-[30px] bg-slate-50 border border-slate-200 rounded-md px-2 flex-1 min-w-[180px]">
+                <Calendar className="h-3 w-3 text-slate-400 shrink-0" />
+                <input 
+                  type="date" 
+                  value={selectedDate}
+                  onChange={e => setSelectedDate(e.target.value)}
+                  className="bg-transparent text-[11px] outline-none w-full min-w-0 font-medium text-slate-700"
+                />
+                <span className="text-slate-300 text-[10px] shrink-0">~</span>
+                <input 
+                  type="date" 
+                  value={selectedEndDate}
+                  onChange={e => setSelectedEndDate(e.target.value)}
+                  className="bg-transparent text-[11px] outline-none w-full min-w-0 font-medium text-slate-700"
+                />
+              </div>
+            </div>
+          </div>
+
+          <div className="h-px bg-slate-100 w-full"></div>
+
+          {/* ROW 2: Search & Actions */}
+          <div className="flex flex-col sm:flex-row gap-2.5 items-start sm:items-center justify-between">
+            {/* Search */}
+            <div className="relative w-full sm:w-[280px]">
+              <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-slate-400" />
+              <input 
+                type="text" 
+                placeholder="Tìm kiếm nhanh mã đơn, lỗi..." 
+                value={searchQuery}
+                onChange={e => setSearchQuery(e.target.value)}
+                className="w-full pl-8 pr-2 h-[30px] border border-slate-200 rounded-md text-[11px] bg-slate-50 focus:ring-1 focus:ring-blue-500 outline-none font-medium text-slate-700"
+              />
+            </div>
+
+            {/* Actions */}
+            <div className="flex items-center flex-wrap gap-2 w-full sm:w-auto justify-end">
+              <button
+                onClick={toggleSortOrder}
+                className="text-[11px] flex items-center justify-center gap-1 text-slate-600 hover:text-slate-800 font-medium bg-slate-50 hover:bg-slate-100 border border-slate-200 px-2 h-[30px] rounded-md transition-all"
+                title="Sắp xếp theo thời gian"
+              >
+                <ArrowUpDown className="h-3 w-3" />
+                {sortOrder === 'desc' ? 'Mới nhất' : 'Cũ nhất'}
+              </button>
+              
+              {isAdmin && (
+                <>
+                  <button
+                    onClick={handleExportToExcel}
+                    disabled={isLoading || filteredReports.length === 0}
+                    className="text-[11px] flex items-center justify-center gap-1 text-green-700 hover:text-green-800 font-medium bg-green-50 hover:bg-green-100 border border-green-200 px-2 h-[30px] rounded-md transition-all disabled:opacity-50"
+                  >
+                    <Download className="h-3 w-3" />
+                    <span className="hidden sm:inline">Excel</span>
+                  </button>
+                  
+                  <button
+                    onClick={handleDownloadBulkZIP}
+                    disabled={isLoading || filteredReports.length === 0}
+                    className="text-[11px] flex items-center justify-center gap-1 text-amber-700 hover:text-amber-800 font-medium bg-amber-50 hover:bg-amber-100 border border-amber-200 px-2 h-[30px] rounded-md transition-all disabled:opacity-50"
+                    title="Tải ảnh ZIP"
+                  >
+                    <Download className="h-3 w-3" />
+                    <span className="hidden sm:inline">Ảnh ZIP</span>
+                  </button>
+                </>
+              )}
+              
+              <button
+                onClick={() => fetchReports(true)}
+                disabled={isLoading}
+                className="text-[11px] flex items-center justify-center gap-1 text-blue-700 hover:text-blue-800 font-medium bg-blue-50 hover:bg-blue-100 border border-blue-200 px-2 h-[30px] rounded-md transition-all disabled:opacity-50"
+              >
+                <RefreshCw className={`h-3 w-3 ${isLoading ? 'animate-spin' : ''}`} />
+                <span className="hidden sm:inline">Làm mới</span>
+              </button>
+            </div>
           </div>
         </div>
-      </div>
 
       {/* Sync Status Banner */}
       {(syncStatusMsg || reports.some(r => r.isLocalOnly)) && (
@@ -1135,157 +1239,6 @@ export const QCHistory = React.memo(function QCHistory({ user, token, userProfil
         </div>
       )}
 
-      {/* Filter and Search Section */}
-      <section className="bg-white rounded-xl border border-slate-200 shadow-sm p-3.5 sm:p-4 mb-4 shrink-0">
-        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-9 gap-3 sm:gap-3.5 items-end">
-          {/* Text Search */}
-          <div className="col-span-1 sm:col-span-2 md:col-span-3 flex flex-col gap-1.5">
-            <div className="flex justify-between items-center">
-              <label className="text-xs font-bold text-slate-500 uppercase tracking-wider">Tìm kiếm nhanh</label>
-              <button
-                type="button"
-                onClick={() => setShowMobileFilters(!showMobileFilters)}
-                className="md:hidden text-[11px] font-bold py-1 px-2.5 rounded-lg text-blue-600 bg-blue-50 border border-blue-100/50 hover:bg-blue-100 cursor-pointer select-none transition-all duration-150 flex items-center gap-1 leading-none"
-              >
-                {showMobileFilters ? 'Ẩn bộ lọc ✕' : 'Lọc nâng cao ⚙️'}
-              </button>
-            </div>
-            <div className="relative">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
-              <input 
-                type="text" 
-                placeholder="Nhập mã đơn, mã màu, lỗi..." 
-                value={searchQuery}
-                onChange={e => setSearchQuery(e.target.value)}
-                className="w-full pl-9 pr-3 py-2 border border-slate-200 rounded-lg text-sm bg-slate-50 focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition-all font-semibold text-slate-800"
-              />
-            </div>
-          </div>
-
-          {/* Floor Selection */}
-          <div className={`col-span-1 md:col-span-2 flex flex-col gap-1.5 ${showMobileFilters ? 'flex animate-in slide-in-from-top-1 duration-150' : 'hidden md:flex'}`}>
-            <label className="text-xs font-bold text-slate-500 uppercase tracking-wider">Khu vực / Lầu</label>
-            <select
-              value={selectedFloor}
-              onChange={e => setSelectedFloor(e.target.value)}
-              className="w-full py-2 px-2.5 border border-slate-200 rounded-lg text-sm bg-slate-50 outline-none focus:ring-2 focus:ring-blue-500 cursor-pointer font-semibold text-slate-800"
-            >
-              <option value="all">Tất cả khu vực</option>
-              {uniqueFloors.map(floor => (
-                <option key={floor} value={floor}>{floor}</option>
-              ))}
-            </select>
-          </div>
-
-          {/* Supplier Selection */}
-          <div className={`col-span-1 md:col-span-2 flex flex-col gap-1.5 ${showMobileFilters ? 'flex animate-in slide-in-from-top-1 duration-150' : 'hidden md:flex'}`}>
-            <label className="text-xs font-bold text-slate-500 uppercase tracking-wider">Xưởng cung ứng</label>
-            <select
-              value={selectedSupplier}
-              onChange={e => setSelectedSupplier(e.target.value)}
-              className="w-full py-2 px-2.5 border border-slate-200 rounded-lg text-sm bg-slate-50 outline-none focus:ring-2 focus:ring-blue-500 cursor-pointer font-semibold text-slate-800"
-            >
-              <option value="all">Tất cả xưởng</option>
-              {uniqueSuppliers.map(sup => (
-                <option key={sup} value={sup}>{sup}</option>
-              ))}
-            </select>
-          </div>
-
-          {/* Synchronized Status */}
-          <div className={`col-span-1 md:col-span-2 flex flex-col gap-1.5 ${showMobileFilters ? 'flex animate-in slide-in-from-top-1 duration-150' : 'hidden md:flex'}`}>
-            <label className="text-xs font-bold text-slate-500 uppercase tracking-wider">Trạng thái lưu</label>
-            <select
-              value={selectedStatus}
-              onChange={e => setSelectedStatus(e.target.value)}
-              className="w-full py-2 px-2.5 border border-slate-200 rounded-lg text-sm bg-slate-50 outline-none focus:ring-2 focus:ring-blue-500 cursor-pointer font-semibold text-slate-800"
-            >
-              <option value="all">Tất cả trạng thái</option>
-              <option value="synced">Đã đồng bộ mây</option>
-              <option value="offline">Lưu tạm offline</option>
-            </select>
-          </div>
-
-          {/* Date Picker Group (From - To Date) */}
-          <div className={`col-span-1 sm:col-span-2 md:col-span-3 flex flex-col gap-1.5 justify-end ${showMobileFilters ? 'flex animate-in slide-in-from-top-1 duration-150' : 'hidden sm:flex'}`}>
-            <label className="text-xs font-bold text-slate-500 uppercase tracking-wider flex items-center gap-1.5">
-              <Calendar className="h-3.5 w-3.5 text-slate-400" /> Ngày báo cáo (Từ - Đến)
-            </label>
-            <div className="flex items-center gap-1.5 w-full">
-              <input 
-                type="date" 
-                id="selectedDate"
-                value={selectedDate}
-                onChange={e => setSelectedDate(e.target.value)}
-                className="w-full flex-1 py-1.5 px-2 border border-slate-200 rounded-lg text-xs bg-slate-50 outline-none focus:ring-2 focus:ring-blue-500 cursor-pointer font-semibold"
-                title="Từ ngày"
-              />
-              <span className="text-slate-400 text-xs shrink-0 font-bold">~</span>
-              <input 
-                type="date" 
-                id="selectedEndDate"
-                value={selectedEndDate}
-                onChange={e => setSelectedEndDate(e.target.value)}
-                className="w-full flex-1 py-1.5 px-2 border border-slate-200 rounded-lg text-xs bg-slate-50 outline-none focus:ring-2 focus:ring-blue-500 cursor-pointer font-semibold"
-                title="Đến ngày"
-              />
-              {(selectedDate || selectedEndDate) && (
-                <button 
-                  onClick={() => { setSelectedDate(''); setSelectedEndDate(''); }}
-                  className="px-2 py-1.5 border border-slate-200 rounded-lg bg-slate-100 hover:bg-slate-200 text-xs font-bold cursor-pointer text-slate-500 shrink-0"
-                  title="Xóa bộ lọc ngày"
-                >
-                  X
-                </button>
-              )}
-            </div>
-          </div>
-        </div>
-
-        <div className="flex items-center justify-between border-t border-slate-100 mt-3 pt-3 flex-wrap gap-3">
-          <div className="text-xs text-slate-400">
-            Hiển thị <span className="font-bold text-slate-700">{filteredReports.length}</span> / {reports.length} báo cáo lỗi
-          </div>
-          <div className="flex items-center gap-3">
-            <button
-              onClick={toggleSortOrder}
-              className="text-xs flex items-center gap-1.5 text-slate-600 hover:text-slate-800 font-semibold cursor-pointer bg-slate-50 hover:bg-slate-100 border border-slate-200 py-1.5 px-3 rounded-lg"
-            >
-              <ArrowUpDown className="h-3.5 w-3.5" />
-              Sắp xếp: {sortOrder === 'desc' ? 'Mới nhất' : 'Cũ nhất'}
-            </button>
-            {isAdmin && (
-              <>
-                <button
-                  onClick={handleExportToExcel}
-                  disabled={isLoading || filteredReports.length === 0}
-                  className="text-xs flex items-center gap-1.5 text-green-600 hover:text-green-800 font-semibold cursor-pointer bg-green-50 hover:bg-green-100 border border-green-200 py-1.5 px-3 rounded-lg transition-all"
-                >
-                  <Download className="h-3.5 w-3.5" />
-                  Xuất Excel
-                </button>
-                <button
-                  onClick={handleDownloadBulkZIP}
-                  disabled={isLoading || filteredReports.length === 0}
-                  className="text-xs flex items-center gap-1.5 text-amber-600 hover:text-amber-800 font-semibold cursor-pointer bg-amber-50 hover:bg-amber-100 border border-amber-200 py-1.5 px-3 rounded-lg transition-all"
-                  title="Tải toàn bộ hình ảnh trong danh sách hiện tại thành file ZIP"
-                >
-                  <Download className="h-3.5 w-3.5" />
-                  Tải Ảnh ZIP
-                </button>
-              </>
-            )}
-            <button
-              onClick={() => fetchReports(true)}
-              disabled={isLoading}
-              className="text-xs flex items-center gap-1.5 text-blue-600 hover:text-blue-800 font-semibold cursor-pointer bg-blue-50 hover:bg-blue-100/75 border border-blue-100 py-1.5 px-3 rounded-lg transition-all"
-            >
-              <RefreshCw className={`h-3.5 w-3.5 ${isLoading ? 'animate-spin' : ''}`} />
-              {isLoading ? 'Đang tải...' : 'Làm mới'}
-            </button>
-          </div>
-        </div>
-      </section>
 
       {/* Reports List */}
       <div className={`flex-1 min-h-0 h-auto md:overflow-y-auto pr-1 flex flex-col gap-3 pb-6 ${selectedReport ? 'hidden lg:flex' : 'flex'}`}>

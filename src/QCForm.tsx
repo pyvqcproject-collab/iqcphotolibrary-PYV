@@ -840,7 +840,7 @@ export function QCForm({ user, token, onLogout }: QCFormProps) {
       ) : (
         <>
       {/* Header */}
-      <header className={`bg-[#000080] text-white px-3 sm:px-6 h-16 flex items-center justify-between shadow-md shrink-0 transition-all duration-300 ${isScrolling ? '-mt-16 md:mt-0' : 'mt-0'}`}>
+      <header className={`bg-[#000080] text-white px-3 sm:px-6 h-16 flex items-center justify-between shadow-md shrink-0 transition-transform duration-300 z-50 fixed top-0 inset-x-0 md:relative md:transform-none ${isScrolling ? '-translate-y-full' : 'translate-y-0'}`}>
         <div className="flex items-center gap-3 sm:gap-6">
           <div className="flex items-center shrink-0">
             <div className="flex flex-col leading-tight">
@@ -920,7 +920,7 @@ export function QCForm({ user, token, onLogout }: QCFormProps) {
       </header>
 
       {/* Main Content */}
-      <main onScroll={handleScroll} className={`flex-1 overflow-y-auto p-3 sm:p-4 lg:p-6 pb-[50vh] md:pb-6 bg-slate-50 ${activeTab === 'create' ? 'block' : 'hidden'}`}>
+      <main onScroll={handleScroll} className={`flex-1 overflow-y-auto p-3 pt-[76px] sm:p-4 sm:pt-[80px] md:p-4 lg:p-6 pb-[50vh] md:pb-6 bg-slate-50 ${activeTab === 'create' ? 'block' : 'hidden'}`}>
         
         {/* User restrictions notification */}
           {userProfile?.role === 'admin' ? (
@@ -1319,12 +1319,12 @@ export function QCForm({ user, token, onLogout }: QCFormProps) {
           </form>
         </main>
 
-     <main onScroll={handleScroll} className={`flex-1 overflow-y-auto md:overflow-hidden pb-[50vh] md:pb-0 bg-slate-50 ${activeTab === 'history' ? 'flex flex-col' : 'hidden'}`}>
+     <main onScroll={handleScroll} className={`flex-1 overflow-y-auto md:overflow-hidden pt-[64px] md:pt-0 pb-[50vh] md:pb-0 bg-slate-50 ${activeTab === 'history' ? 'flex flex-col' : 'hidden'}`}>
         <QCHistory user={user} token={token} userProfile={userProfile} onNavigateToCreate={handleNavigateToCreate} isActive={activeTab === 'history'} />
       </main>
 
       {isAdmin && (
-        <main onScroll={handleScroll} className={`flex-1 overflow-y-auto md:overflow-hidden pb-[50vh] md:pb-0 bg-slate-50 ${activeTab === 'admin' ? 'flex flex-col' : 'hidden'}`}>
+        <main onScroll={handleScroll} className={`flex-1 overflow-y-auto md:overflow-hidden pt-[64px] md:pt-0 pb-[50vh] md:pb-0 bg-slate-50 ${activeTab === 'admin' ? 'flex flex-col' : 'hidden'}`}>
           <AdminPanel onMappingChange={loadConfiguration} />
         </main>
       )}

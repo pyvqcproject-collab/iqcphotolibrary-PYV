@@ -89,6 +89,14 @@ interface QCFormProps {
 }
 
 export function QCForm({ user, token, onLogout }: QCFormProps) {
+  const sanitizeName = (str: string) => {
+    if (!str) return 'Unknown';
+    let s = str.normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+    s = s.replace(/đ/g, "d").replace(/Đ/g, "D");
+    s = s.replace(/[^a-zA-Z0-9-[]() ]/g, " ");
+    return s.trim().replace(/\s+/g, "_");
+  };
+
   const [activeTab, setActiveTab] = useState<'create' | 'history' | 'admin'>('create');
   const [date, setDate] = useState(format(new Date(), 'yyyy-MM-dd'));
   const [floor, setFloor] = useState('');
@@ -646,7 +654,9 @@ export function QCForm({ user, token, onLogout }: QCFormProps) {
       colorCode,
       errorName,
       supplier,
+      part: userProfile?.part || '',
       employeeId: userProfile?.employeeId || user.email?.split('@')[0] || 'Unknown',
+      employeeName: userProfile?.name || '',
       employeeEmail: user.email || '',
     };
     if (note.trim()) {
@@ -677,11 +687,12 @@ export function QCForm({ user, token, onLogout }: QCFormProps) {
     try {
       const totalFiles = reportFiles.length;
       const timestamp = Date.now();
-      const safeOrder = reportPayloadBase.order.replace(/[^a-zA-Z0-9]/g, '');
-      const safeColor = reportPayloadBase.colorCode.replace(/[^a-zA-Z0-9]/g, '');
-      const safeError = reportPayloadBase.errorName.replace(/[^a-zA-Z0-9]/g, '');
-      const safeSupplier = reportPayloadBase.supplier.replace(/[^a-zA-Z0-9]/g, '');
-      const safeFloor = reportPayloadBase.floor.replace(/[^a-zA-Z0-9]/g, '');
+      const safePart = sanitizeName(reportPayloadBase.part || 'Khong_Bo_Vi');
+      const safeOrder = sanitizeName(reportPayloadBase.order);
+      const safeColor = sanitizeName(reportPayloadBase.colorCode);
+      const safeError = sanitizeName(reportPayloadBase.errorName);
+      const safeSupplier = sanitizeName(reportPayloadBase.supplier);
+      const safeFloor = sanitizeName(reportPayloadBase.floor);
 
       let completedUploads = 0;
 
@@ -840,7 +851,7 @@ export function QCForm({ user, token, onLogout }: QCFormProps) {
       ) : (
         <>
       {/* Header */}
-      <header className={`bg-[#000080] text-white px-3 sm:px-6 h-16 flex items-center justify-between shadow-md shrink-0 transition-transform duration-300 z-50 fixed top-0 inset-x-0 md:relative md:transform-none ${isScrolling ? '-translate-y-full' : 'translate-y-0'}`}>
+      <header className={`bg-[#000080] text-white px-3 sm:px-6 h-16 flex items-center justify-between shadow-md shrink-0 transition-transform duration-300 z-50 fixed top-0 inset-x-0 md:relative md:translate-y-0 ${isScrolling ? '-translate-y-full' : 'translate-y-0'}`}>
         <div className="flex items-center gap-3 sm:gap-6">
           <div className="flex items-center shrink-0">
             <div className="flex flex-col leading-tight">
@@ -1237,7 +1248,7 @@ export function QCForm({ user, token, onLogout }: QCFormProps) {
                   Mẫu đặt tên thông minh
                 </div>
                 <div className="text-[10px] text-slate-500 leading-normal">
-                  File ảnh tải lên sẽ tự động đổi tên thành <strong>[Đơn_hàng]_[Mã_màu]_[Tên_lỗi]_[Xưởng]_[Lầu]...jpg</strong> để phục vụ lưu trữ khoa học.
+                  File ảnh tải lên sẽ tự động đổi tên thành <strong>[Bộ_vị]_[Đơn_hàng]_[Mã_màu]_[Tên_lỗi]_[Xưởng]_[Lầu]...jpg</strong> để phục vụ lưu trữ khoa học.
                 </div>
               </div>
             </section>

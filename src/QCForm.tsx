@@ -594,22 +594,11 @@ export function QCForm({ user, token, onLogout }: QCFormProps) {
   };
 
   // --- Mobile Scroll Hide Logic ---
-  const [isScrolling, setIsScrolling] = useState(false);
-  const scrollTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const [isAtTop, setIsAtTop] = useState(true);
 
-  const handleScroll = () => {
-    setIsScrolling(true);
-    if (scrollTimeoutRef.current) clearTimeout(scrollTimeoutRef.current);
-    scrollTimeoutRef.current = setTimeout(() => {
-      setIsScrolling(false);
-    }, 400);
+  const handleScroll = (e: React.UIEvent<HTMLElement>) => {
+    setIsAtTop(e.currentTarget.scrollTop <= 10);
   };
-
-  useEffect(() => {
-    return () => {
-      if (scrollTimeoutRef.current) clearTimeout(scrollTimeoutRef.current);
-    };
-  }, []);
 
   const handleLogout = () => {
     onLogout();
@@ -851,7 +840,7 @@ export function QCForm({ user, token, onLogout }: QCFormProps) {
       ) : (
         <>
       {/* Header */}
-      <header className={`bg-[#000080] text-white px-3 sm:px-6 h-16 flex items-center justify-between shadow-md shrink-0 transition-transform duration-300 z-50 fixed top-0 inset-x-0 md:relative md:translate-y-0 ${isScrolling ? '-translate-y-full' : 'translate-y-0'}`}>
+      <header className={`bg-[#000080] text-white px-3 sm:px-6 h-16 flex items-center justify-between shadow-md shrink-0 transition-transform duration-300 z-50 fixed top-0 inset-x-0 md:relative md:translate-y-0 ${!isAtTop ? '-translate-y-full' : 'translate-y-0'}`}>
         <div className="flex items-center gap-3 sm:gap-6">
           <div className="flex items-center shrink-0">
             <div className="flex flex-col leading-tight">
@@ -931,7 +920,7 @@ export function QCForm({ user, token, onLogout }: QCFormProps) {
       </header>
 
       {/* Main Content */}
-      <main onScroll={handleScroll} className={`flex-1 overflow-y-auto p-3 pt-[76px] sm:p-4 sm:pt-[80px] md:p-4 lg:p-6 pb-[50vh] md:pb-6 bg-slate-50 ${activeTab === 'create' ? 'block' : 'hidden'}`}>
+      <main onScroll={handleScroll} className={`flex-1 overflow-y-auto p-3 pt-[76px] sm:p-4 sm:pt-[80px] md:p-4 lg:p-6 pb-32 md:pb-6 bg-slate-50 ${activeTab === 'create' ? 'block' : 'hidden'}`}>
         
         {/* User restrictions notification */}
           {userProfile?.role === 'admin' ? (
@@ -1330,44 +1319,41 @@ export function QCForm({ user, token, onLogout }: QCFormProps) {
           </form>
         </main>
 
-     <main onScroll={handleScroll} className={`flex-1 overflow-y-auto md:overflow-hidden pt-[64px] md:pt-0 pb-[50vh] md:pb-0 bg-slate-50 ${activeTab === 'history' ? 'flex flex-col' : 'hidden'}`}>
+     <main onScroll={handleScroll} className={`flex-1 overflow-y-auto md:overflow-hidden pt-[64px] md:pt-0 pb-32 md:pb-0 bg-slate-50 ${activeTab === 'history' ? 'flex flex-col' : 'hidden'}`}>
         <QCHistory user={user} token={token} userProfile={userProfile} onNavigateToCreate={handleNavigateToCreate} isActive={activeTab === 'history'} />
       </main>
 
       {isAdmin && (
-        <main onScroll={handleScroll} className={`flex-1 overflow-y-auto md:overflow-hidden pt-[64px] md:pt-0 pb-[50vh] md:pb-0 bg-slate-50 ${activeTab === 'admin' ? 'flex flex-col' : 'hidden'}`}>
+        <main onScroll={handleScroll} className={`flex-1 overflow-y-auto md:overflow-hidden pt-[64px] md:pt-0 pb-32 md:pb-0 bg-slate-50 ${activeTab === 'admin' ? 'flex flex-col' : 'hidden'}`}>
           <AdminPanel onMappingChange={loadConfiguration} />
         </main>
       )}
 
       {/* Mobile Bottom Tab Navigation */}
-      <nav className={`md:hidden fixed bottom-0 inset-x-0 bg-[#000080] border-t border-white/10 pb-safe pt-2 px-4 flex justify-around items-center z-50 shadow-xl transition-transform duration-300 transform ${isScrolling ? 'translate-y-full' : 'translate-y-0'}`}>
+      <nav className="md:hidden fixed bottom-0 inset-x-0 bg-[#000080] border-t border-white/10 pb-safe h-[52px] flex justify-around items-center z-50 shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.1)]">
         <button
           type="button"
           onClick={() => setActiveTab('create')}
-          className={`flex flex-col items-center justify-center gap-1.5 py-1 px-3 rounded-lg text-center cursor-pointer border-none bg-transparent select-none transition-all ${activeTab === 'create' ? 'text-blue-400 font-extrabold scale-105' : 'text-slate-400 hover:text-white'}`}
+          className={`flex items-center justify-center p-2 rounded-full cursor-pointer border-none bg-transparent select-none transition-all ${activeTab === 'create' ? 'text-blue-400 font-extrabold scale-110 bg-blue-900/30' : 'text-slate-400 hover:text-white'}`}
         >
-          <PlusCircle className="h-5.5 w-5.5" />
-          <span className="text-[10px] tracking-wide font-bold">Tạo Báo Cáo</span>
+          <PlusCircle className="h-6 w-6" />
         </button>
         
         <button
           type="button"
           onClick={() => setActiveTab('history')}
-          className={`flex flex-col items-center justify-center gap-1.5 py-1 px-3 rounded-lg text-center cursor-pointer border-none bg-transparent select-none transition-all ${activeTab === 'history' ? 'text-blue-400 font-extrabold scale-105' : 'text-slate-400 hover:text-white'}`}
+          className={`flex items-center justify-center p-2 rounded-full cursor-pointer border-none bg-transparent select-none transition-all ${activeTab === 'history' ? 'text-blue-400 font-extrabold scale-110 bg-blue-900/30' : 'text-slate-400 hover:text-white'}`}
         >
-          <History className="h-5.5 w-5.5" />
-          <span className="text-[10px] tracking-wide font-bold">Lịch Sử QC</span>
+          <History className="h-6 w-6" />
         </button>
         
         {isAdmin && (
           <button
             type="button"
             onClick={() => setActiveTab('admin')}
-            className={`flex flex-col items-center justify-center gap-1.5 py-1 px-3 rounded-lg text-center cursor-pointer border-none bg-transparent select-none transition-all ${activeTab === 'admin' ? 'text-blue-400 font-extrabold scale-105' : 'text-slate-400 hover:text-white'}`}
+            className={`flex items-center justify-center p-2 rounded-full cursor-pointer border-none bg-transparent select-none transition-all ${activeTab === 'admin' ? 'text-blue-400 font-extrabold scale-110 bg-blue-900/30' : 'text-slate-400 hover:text-white'}`}
           >
-            <Settings className="h-5.5 w-5.5" />
-            <span className="text-[10px] tracking-wide font-bold">Cấu hình</span>
+            <Settings className="h-6 w-6" />
           </button>
         )}
       </nav>

@@ -52,6 +52,10 @@ interface QCReport {
   imageUrls: string[];
   employeeId: string;
   employeeEmail: string;
+  employeeName?: string;
+  isDownloaded?: boolean;
+  downloadedBy?: string[];
+  part?: string;
   note?: string;
   createdAt: any; // String ISO representation or Firebase timestamp
   isLocalOnly?: boolean;
@@ -255,6 +259,8 @@ export const QCHistory = React.memo(function QCHistory({ user, token, userProfil
   const [editColorCode, setEditColorCode] = useState('');
   const [editErrorName, setEditErrorName] = useState('');
   const [editSupplier, setEditSupplier] = useState('');
+  const [editNote, setEditNote] = useState('');
+  const [editPart, setEditPart] = useState('');
   const [isSavingEdit, setIsSavingEdit] = useState(false);
   
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
@@ -279,6 +285,8 @@ export const QCHistory = React.memo(function QCHistory({ user, token, userProfil
     setEditColorCode(selectedReport.colorCode);
     setEditErrorName(selectedReport.errorName);
     setEditSupplier(selectedReport.supplier);
+    setEditNote(selectedReport.note || '');
+    setEditPart(selectedReport.part || '');
     setAdminActionError('');
     setIsEditing(true);
   };
@@ -435,6 +443,7 @@ export const QCHistory = React.memo(function QCHistory({ user, token, userProfil
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedFloor, setSelectedFloor] = useState('all');
   const [selectedSupplier, setSelectedSupplier] = useState('all');
+  const [selectedDownloaded, setSelectedDownloaded] = useState('all');
   const [selectedStatus, setSelectedStatus] = useState('all');
   const [selectedDate, setSelectedDate] = useState('');
   const [selectedEndDate, setSelectedEndDate] = useState('');
@@ -500,8 +509,10 @@ export const QCHistory = React.memo(function QCHistory({ user, token, userProfil
         { header: 'Lỗi', key: 'error', width: 25 },
         { header: 'Khu vực', key: 'floor', width: 15 },
         { header: 'Xưởng', key: 'supplier', width: 15 },
+        { header: 'Bộ vị', key: 'part', width: 15 },
         { header: 'Ngày lỗi', key: 'date', width: 15 },
-        { header: 'Người báo cáo', key: 'reporter', width: 15 },
+        { header: 'Mã NV', key: 'reporter', width: 15 },
+        { header: 'Tên nhân viên', key: 'reporterName', width: 20 },
         { header: 'Ghi chú', key: 'note', width: 25 },
         { header: 'Hình ảnh lỗi', key: 'image', width: 30 }
       ];
@@ -521,28 +532,43 @@ export const QCHistory = React.memo(function QCHistory({ user, token, userProfil
           error: report.errorName,
           floor: report.floor,
           supplier: report.supplier,
+          part: report.part || '',
           date: format(parseISO(report.date), 'dd/MM/yyyy'),
           reporter: report.employeeId,
+          reporterName: report.employeeName || '',
           note: report.note || ''
         });
 
-        // Add Image
+        // Add All Images
         if (report.imageUrls && report.imageUrls.length > 0) {
           worksheet.getRow(rowIndex).height = 100; // row height 100
           
-          const base64 = await getBase64ImageFromUrl(report.imageUrls[0]);
-          if (base64) {
-            const imageId = workbook.addImage({
-              base64: base64,
-              extension: 'jpeg',
-            });
-            worksheet.addImage(imageId, {
-              tl: { col: 8, row: rowIndex - 1 }, // Column I (0-indexed 8)
-              ext: { width: 120, height: 120 },
-              editAs: 'oneCell'
-            });
-          } else {
-             worksheet.getCell(`I${rowIndex}`).value = "Lỗi tải ảnh";
+          for (let imgIndex = 0; imgIndex < report.imageUrls.length; imgIndex++) {
+            const colIndex = imgIndex + 10; // Col K (10, 0-indexed). Columns are: 0:po, 1:color, 2:error, 3:floor, 4:supplier, 5:part, 6:date, 7:reporter, 8:reporterName, 9:note. Images start at 10.
+            
+            // Ensure header exists for extra images
+            if (imgIndex > 0) {
+              const currentHeader = worksheet.getCell(1, colIndex + 1).value;
+              if (!currentHeader) {
+                 worksheet.getCell(1, colIndex + 1).value = `Hình ảnh lỗi ${imgIndex + 1}`;
+                 worksheet.getColumn(colIndex + 1).width = 30;
+              }
+            }
+            
+            const base64 = await getBase64ImageFromUrl(report.imageUrls[imgIndex]);
+            if (base64) {
+              const imageId = workbook.addImage({
+                base64: base64,
+                extension: 'jpeg',
+              });
+              worksheet.addImage(imageId, {
+                tl: { col: colIndex, row: rowIndex - 1 }, // 0-indexed column
+                ext: { width: 120, height: 120 },
+                editAs: 'oneCell'
+              });
+            } else {
+               worksheet.getCell(rowIndex, colIndex + 1).value = "Lỗi tải ảnh";
+            }
           }
         }
         
@@ -575,12 +601,13 @@ export const QCHistory = React.memo(function QCHistory({ user, token, userProfil
       const zip = new JSZip();
       for (const report of filteredReports) {
         if (!report.imageUrls || report.imageUrls.length === 0) continue;
+        const safePart = sanitizeName(report.part || 'Khong_Bo_Vi');
         const safeOrder = sanitizeName(report.order);
         const safeColor = sanitizeName(report.colorCode);
         const safeError = sanitizeName(report.errorName);
         const safeSupplier = sanitizeName(report.supplier);
         const safeFloor = sanitizeName(report.floor);
-        const namePrefix = `${safeOrder}_${safeColor}_${safeError}_${safeSupplier}_${safeFloor}`;
+        const namePrefix = `${safePart}_${safeOrder}_${safeColor}_${safeError}_${safeSupplier}_${safeFloor}`;
         
         for (let i = 0; i < report.imageUrls.length; i++) {
            const url = report.imageUrls[i];
@@ -631,12 +658,21 @@ export const QCHistory = React.memo(function QCHistory({ user, token, userProfil
     const objectUrl = selectedReport.imageUrls[activeDetailImageIndex];
     if (!objectUrl) return;
 
+    if (isAdmin && !selectedReport.isLocalOnly) {
+         try {
+            const { arrayUnion: aU, updateDoc: uD, doc: fDoc } = await import('firebase/firestore');
+            await uD(fDoc(db, 'qc_reports', selectedReport.id), { downloadedBy: aU(user.email || '') });
+            setReports(prev => prev.map(r => r.id === selectedReport.id ? { ...r, downloadedBy: [...(r.downloadedBy || []), user.email || ''] } : r));
+         } catch(e) { console.error("Failed to mark as downloaded:", e); }
+    }
+
+    const safePart = sanitizeName(selectedReport.part || 'Khong_Bo_Vi');
     const safeOrder = sanitizeName(selectedReport.order);
     const safeColor = sanitizeName(selectedReport.colorCode);
     const safeError = sanitizeName(selectedReport.errorName);
     const safeSupplier = sanitizeName(selectedReport.supplier);
     const safeFloor = sanitizeName(selectedReport.floor);
-    const namePrefix = `${safeOrder}_${safeColor}_${safeError}_${safeSupplier}_${safeFloor}`;
+    const namePrefix = `${safePart}_${safeOrder}_${safeColor}_${safeError}_${safeSupplier}_${safeFloor}`;
     
     // We already have 'getBase64ImageFromUrl' which handles the CORS/object URL properly
     const actualDownloadUrl = loadedImageUrls[activeDetailImageIndex] || objectUrl;
@@ -647,6 +683,15 @@ export const QCHistory = React.memo(function QCHistory({ user, token, userProfil
     if (!selectedReport || !selectedReport.imageUrls) return;
     setIsLoading(true);
     try {
+      if (isAdmin && !selectedReport.isLocalOnly) {
+         try {
+            const docRef = doc(db, 'qc_reports', selectedReport.id);
+            // Fallback for arrayUnion if it wasn't imported properly
+            const { arrayUnion: aU, updateDoc: uD } = await import('firebase/firestore');
+            await uD(docRef, { downloadedBy: aU(user.email || '') });
+            setReports(prev => prev.map(r => r.id === selectedReport.id ? { ...r, downloadedBy: [...(r.downloadedBy || []), user.email || ''] } : r));
+         } catch(e) { console.error("Failed to mark as downloaded:", e); }
+      }
       const safeOrder = sanitizeName(selectedReport.order);
       const safeColor = sanitizeName(selectedReport.colorCode);
       const safeError = sanitizeName(selectedReport.errorName);
@@ -740,6 +785,11 @@ export const QCHistory = React.memo(function QCHistory({ user, token, userProfil
             imageUrls: data.imageUrls || [],
             employeeId: data.employeeId,
             employeeEmail: data.employeeEmail,
+            employeeName: data.employeeName || '',
+            isDownloaded: data.isDownloaded || false,
+            downloadedBy: data.downloadedBy || [],
+            part: data.part || '',
+            note: data.note || '',
             createdAt: data.createdAt?.toDate ? data.createdAt.toDate().toISOString() : data.createdAt,
             isLocalOnly: false
           });
@@ -921,6 +971,7 @@ export const QCHistory = React.memo(function QCHistory({ user, token, userProfil
         colorCode: report.colorCode || '',
         errorName: report.errorName || '',
         supplier: report.supplier || '',
+        part: report.part || '',
         imageUrls: finalImageUrls,
         employeeId: report.employeeId || '',
         employeeEmail: user.email || report.employeeEmail || '',
@@ -1292,6 +1343,14 @@ export const QCHistory = React.memo(function QCHistory({ user, token, userProfil
                       </h3>
                       
                       <div className="flex flex-wrap items-center gap-2">
+                        <span className="text-xs font-bold text-purple-700 bg-purple-50 px-2 py-0.5 rounded border border-purple-100 truncate max-w-[120px]">
+                          {report.part || 'Khong_Bo_Vi'}
+                        </span>
+                        {isAdmin && report.downloadedBy && report.downloadedBy.includes(user.email || '') && (
+                          <span className="text-[10px] font-bold text-slate-600 bg-slate-200 px-1.5 py-0.5 rounded-full border border-slate-300 flex items-center gap-1">
+                             <CheckCircle className="h-3 w-3" /> Đã tải
+                          </span>
+                        )}
                         <span className="text-xs font-bold font-mono text-slate-600 bg-slate-100/80 px-2 py-0.5 rounded border border-slate-200/60">
                           PO: {report.order || 'N/A'}
                         </span>
@@ -1518,6 +1577,18 @@ export const QCHistory = React.memo(function QCHistory({ user, token, userProfil
                         placeholder="Nhập lầu hoặc khu vực..."
                       />
                     </div>
+                    <div className="flex flex-col gap-1.5">
+                      <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider flex items-center gap-1">
+                        <Layers className="h-3 w-3 text-slate-400" /> Bộ Vị
+                      </label>
+                      <input 
+                        type="text"
+                        value={editPart}
+                        onChange={e => setEditPart(e.target.value)}
+                        className="w-full p-2 border border-slate-200 rounded-lg text-sm bg-white focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition-all text-slate-800 font-bold"
+                        placeholder="Nhập bộ vị (Ví dụ: ĐẾ THÔ)..."
+                      />
+                    </div>
 
                     <div className="flex flex-col gap-1.5">
                       <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider flex items-center gap-1 font-mono">
@@ -1570,6 +1641,19 @@ export const QCHistory = React.memo(function QCHistory({ user, token, userProfil
                         placeholder="Nhập xưởng cung ứng..."
                       />
                     </div>
+                    
+                    <div className="flex flex-col gap-1.5">
+                      <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider flex items-center gap-1">
+                        <FileText className="h-3 w-3 text-slate-400" /> Ghi Chú Chi Tiết
+                      </label>
+                      <textarea 
+                        value={editNote}
+                        onChange={e => setEditNote(e.target.value)}
+                        rows={3}
+                        className="w-full p-2 border border-slate-200 rounded-lg text-sm bg-white focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition-all text-slate-800 resize-y"
+                        placeholder="Mô tả cụ thể vấn đề hoặc hướng xử lý..."
+                      />
+                    </div>
 
                     <div className="flex gap-2.5 pt-2 border-t border-slate-200 mt-2">
                       <button
@@ -1611,6 +1695,13 @@ export const QCHistory = React.memo(function QCHistory({ user, token, userProfil
                         </span>
                         <span className="text-sm font-bold text-slate-700">{selectedReport.floor}</span>
                       </div>
+                      
+                      <div className="bg-slate-50 p-3 rounded-lg border border-slate-100 flex flex-col">
+                        <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider flex items-center gap-1 mb-1">
+                          <Layers className="h-3 w-3 text-slate-400" /> Bộ Vị
+                        </span>
+                        <span className="text-sm font-bold text-slate-700">{selectedReport.part || 'Không xác định'}</span>
+                      </div>
 
                       <div className="bg-slate-50 p-3 rounded-lg border border-slate-100 flex flex-col">
                         <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider flex items-center gap-1 mb-1">
@@ -1643,6 +1734,13 @@ export const QCHistory = React.memo(function QCHistory({ user, token, userProfil
                           {selectedReport.createdAt ? format(new Date(selectedReport.createdAt), 'dd/MM/yyyy HH:mm:ss') : 'Ngoại tuyến'}
                         </span>
                       </div>
+                      
+                      {selectedReport.note && (
+                        <div className="flex flex-col gap-1 py-2 mt-1 border-t border-slate-100">
+                           <span className="font-medium text-slate-500">Ghi chú chi tiết:</span>
+                           <span className="text-sm font-semibold text-slate-700 whitespace-pre-wrap leading-relaxed">{selectedReport.note}</span>
+                        </div>
+                      )}
                     </div>
                   </>
                 )}

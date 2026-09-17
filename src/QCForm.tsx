@@ -817,7 +817,7 @@ export function QCForm({ user, token, onLogout }: QCFormProps) {
   return (
     <div className="h-[100dvh] flex flex-col bg-slate-100 text-slate-800 font-sans overflow-hidden relative">
       {isUnauthorized ? (
-        <div className="flex-1 flex flex-col items-center justify-center p-6 bg-slate-50 relative z-50">
+        <div className="flex-1 flex flex-col items-center justify-center p-6 bg-[#F8FAFC] relative z-50">
           <div className="bg-white p-8 rounded-xl shadow-md border border-red-200 max-w-md w-full text-center">
             <div className="w-16 h-16 bg-red-100 text-red-600 rounded-full flex items-center justify-center mx-auto mb-4">
               <ShieldAlert className="h-8 w-8" />
@@ -920,34 +920,11 @@ export function QCForm({ user, token, onLogout }: QCFormProps) {
       </header>
 
       {/* Main Content */}
-      <main onScroll={handleScroll} className={`flex-1 overflow-y-auto p-3 pt-[76px] sm:p-4 sm:pt-[80px] md:p-4 lg:p-6 pb-32 md:pb-6 bg-slate-50 ${activeTab === 'create' ? 'block' : 'hidden'}`}>
+      <main onScroll={handleScroll} className={`flex-1 overflow-y-auto p-3 pt-[76px] sm:p-4 sm:pt-[80px] md:p-4 lg:p-6 pb-32 md:pb-6 bg-[#F8FAFC] ${activeTab === 'create' ? 'block' : 'hidden'}`}>
         
-        {/* User restrictions notification */}
-          {userProfile?.role === 'admin' ? (
-            <div className="max-w-6xl mx-auto mb-4 bg-amber-50 border border-amber-200 rounded-xl p-3 px-4 flex items-center justify-between gap-3 text-xs text-amber-800 animate-in slide-in-from-top-3 duration-200">
-              <div className="flex items-center gap-2">
-                 <ShieldCheck className="h-4.5 w-4.5 text-amber-600 shrink-0" />
-                 <span className="font-semibold leading-relaxed">
-                   Tài khoản <strong>Admin</strong>. Bạn có toàn quyền truy cập tất cả các lầu.
-                 </span>
-              </div>
-              <span className="text-[10px] font-bold text-amber-700 bg-white border border-amber-200 px-2 py-0.5 rounded-full select-none shrink-0">Admin Access</span>
-            </div>
-          ) : (userProfile?.permittedFloors && userProfile.permittedFloors.length > 0 && (
-            <div className="max-w-6xl mx-auto mb-4 bg-blue-50 border border-blue-200 rounded-xl p-3 px-4 flex items-center justify-between gap-3 text-xs text-blue-800 animate-in slide-in-from-top-3 duration-200">
-              <div className="flex items-center gap-2">
-                <ShieldCheck className="h-4.5 w-4.5 text-blue-600 shrink-0" />
-                <span className="font-semibold leading-relaxed">
-                  Nhóm tổ máy: <strong>{userProfile.floorGroup}</strong> — Bạn được giới hạn báo lỗi tại các khu vực: <strong>{userProfile.permittedFloors.join(', ')}</strong>.
-                </span>
-              </div>
-              <span className="text-[10px] font-bold text-blue-600 bg-white border border-blue-205 px-2 py-0.5 rounded-full select-none shrink-0">Đã kích hoạt khóa lầu</span>
-            </div>
-          ))}
-
-          <form onSubmit={handleSubmit} className="flex-1 flex flex-col lg:grid lg:grid-cols-[380px_1fr] gap-4 sm:gap-6 max-w-6xl mx-auto pb-6">
+        <form onSubmit={handleSubmit} className="flex-1 flex flex-col lg:grid lg:grid-cols-[380px_1fr] gap-4 sm:gap-6 max-w-6xl mx-auto pb-6">
             {/* Form Card */}
-            <section className="bg-white rounded-xl border border-slate-200 p-4 sm:p-5 flex flex-col gap-3.5 sm:gap-4 shrink-0 lg:h-max shadow-sm">
+            <section className="bg-white rounded-2xl border border-slate-100/80 shadow-[0_2px_12px_-4px_rgba(0,0,0,0.06)] p-4 sm:p-5 flex flex-col gap-3.5 sm:gap-4 shrink-0 lg:h-max shadow-sm">
               <div className="border-b border-slate-100 pb-2.5 sm:pb-3 flex items-center justify-between">
                 <h2 className="m-0 text-sm sm:text-base font-extrabold text-slate-800 uppercase tracking-tight">Chi tiết đơn hàng</h2>
                 <span className="text-[10px] bg-slate-100 px-2 py-0.5 rounded text-slate-500 font-bold uppercase">Mẫu v1.4</span>
@@ -956,29 +933,27 @@ export function QCForm({ user, token, onLogout }: QCFormProps) {
               {/* Date Input & Part (Bộ vị) */}
               <div className="grid grid-cols-2 gap-2.5 sm:gap-3 text-xs">
                 <div className="flex flex-col gap-1 sm:gap-1.5">
-                  <label htmlFor="date" className="font-bold text-slate-600 uppercase tracking-wide">Ngày kiểm hàng</label>
+                  <label htmlFor="date" className="sr-only">Ngày kiểm hàng</label>
                   <input 
                     type="date" 
                     id="date" 
                     required 
                     value={date} 
                     onChange={e => setDate(e.target.value)} 
-                    className="px-3 py-2.5 sm:py-3 border border-slate-200 rounded-lg bg-slate-50 focus:bg-white focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition-all font-semibold text-sm w-full" 
+                    className="px-3.5 py-3 sm:py-3.5 bg-slate-100/80 border-transparent border rounded-xl hover:bg-slate-100 focus:bg-white focus:ring-4 focus:ring-blue-500/15 focus:border-blue-500 focus:border-transparent outline-none transition-all font-semibold text-sm w-full" 
                   />
                 </div>
                 
                 <div className="flex flex-col gap-1 sm:gap-1.5 text-xs">
-                  <label className="font-bold text-slate-600 uppercase tracking-wide flex items-center gap-1">
-                    Bộ Vị 
-                    {!isAdmin && (!userProfile?.parts || userProfile.parts.length <= 1) && <Lock className="h-3 w-3 text-slate-400" />}
+                  <label className="sr-only">Bộ Vị {!isAdmin && (!userProfile?.parts || userProfile.parts.length <= 1) && <Lock className="h-3 w-3 text-slate-400" />}
                   </label>
                   {isAdmin ? (
                     <select
                       value={userProfile?.part || ''}
                       onChange={(e) => handlePartChange(e.target.value)}
-                      className="px-3 py-2.5 sm:py-3 border border-slate-200 rounded-lg bg-orange-50 focus:bg-white focus:ring-2 focus:ring-blue-500 outline-none transition-all font-bold text-slate-800 text-sm w-full truncate"
+                      className="px-3.5 py-3 sm:py-3.5 bg-orange-50 border-orange-200 border rounded-xl focus:bg-white focus:ring-4 focus:ring-blue-500/15 focus:border-blue-500 outline-none transition-all font-bold text-slate-800 text-sm w-full truncate"
                     >
-                      <option value="">Chưa gán (Tất cả)</option>
+                      <option value="">Bộ vị (Chưa gán...)</option>
                       <option value="ĐẾ THÔ">ĐẾ THÔ</option>
                       <option value="ĐẾ PHUN SƠN">ĐẾ PHUN SƠN</option>
                       <option value="MẶT GIÀY">MẶT GIÀY</option>
@@ -987,15 +962,15 @@ export function QCForm({ user, token, onLogout }: QCFormProps) {
                     <select
                       value={userProfile?.part || ''}
                       onChange={(e) => handlePartChange(e.target.value)}
-                      className="px-3 py-2.5 sm:py-3 border border-slate-200 rounded-lg bg-blue-50 focus:bg-white focus:ring-2 focus:ring-blue-500 outline-none transition-all font-bold text-slate-800 text-sm w-full truncate"
+                      className="px-3.5 py-3 sm:py-3.5 bg-blue-50 border-blue-100 border rounded-xl focus:bg-white focus:ring-4 focus:ring-blue-500/15 focus:border-blue-500 outline-none transition-all font-bold text-slate-800 text-sm w-full truncate"
                     >
                       {userProfile.parts.map(p => (
                         <option key={p} value={p}>{p}</option>
                       ))}
                     </select>
                   ) : (
-                    <div className="px-3 py-2.5 sm:py-3 border border-slate-200 rounded-lg bg-slate-100 font-bold text-slate-500 text-sm select-none truncate h-full flex items-center">
-                      {userProfile?.part || 'Chưa gán (Tất cả)'}
+                    <div className="px-3.5 py-3 sm:py-3.5 bg-slate-100/80 border-transparent border rounded-xl font-bold text-slate-500 text-sm select-none truncate h-full flex items-center">
+                      {userProfile?.part || 'Bộ vị (Chưa gán...)'}
                     </div>
                   )}
                 </div>
@@ -1006,13 +981,7 @@ export function QCForm({ user, token, onLogout }: QCFormProps) {
                 
                 {/* LẦU / KHU VỰC DROPDOWN */}
                 <div className="flex flex-col gap-1 sm:gap-1.5">
-                  <label htmlFor="floor" className="font-bold text-slate-600 uppercase tracking-wide flex justify-between gap-1 items-center">
-                    <span className="flex items-center gap-1">
-                      <MapPin className="h-3.5 w-3.5 text-blue-600 shrink-0" />
-                      Lầu / Khu vực
-                    </span>
-                    {floorOption === 'CUSTOM' && <span className="text-orange-600 font-extrabold">[Chế độ tự nhập]</span>}
-                  </label>
+                  <label htmlFor="floor" className="sr-only">Lầu / Khu vực</label>
                   <select
                     id="floor"
                     required
@@ -1025,9 +994,9 @@ export function QCForm({ user, token, onLogout }: QCFormProps) {
                         setFloor('');
                       }
                     }}
-                    className="px-3 py-2.5 sm:py-3 border border-slate-205 rounded-lg bg-slate-50 focus:bg-white focus:ring-2 focus:ring-blue-500 outline-none transition-all font-bold text-slate-800 text-sm"
+                    className="px-3.5 py-3 sm:py-3.5 bg-slate-100/80 border-transparent border rounded-xl hover:bg-slate-100 focus:bg-white focus:ring-4 focus:ring-blue-500/15 focus:border-blue-500 outline-none transition-all font-bold text-slate-800 text-sm"
                   >
-                    <option value="" disabled>-- Chọn lầu --</option>
+                    <option value="" disabled>Lầu / Khu vực (-- Chọn lầu --)</option>
                     {floorOptions.map((fOpt) => (
                       <option key={fOpt} value={fOpt}>
                         {fOpt}
@@ -1043,24 +1012,21 @@ export function QCForm({ user, token, onLogout }: QCFormProps) {
                       placeholder="Nhập tên lầu mới..."
                       value={floor}
                       onChange={e => setFloor(e.target.value.toUpperCase())}
-                      className="mt-1.5 px-3 py-2.5 border-2 border-orange-200 rounded-lg bg-orange-50 focus:bg-white focus:border-orange-400 focus:ring-2 focus:ring-orange-200 outline-none transition-all font-bold text-slate-800 text-sm"
+                      className="mt-1.5 px-3 py-2.5 bg-orange-50 border-orange-200 border-2 rounded-xl focus:bg-white focus:ring-4 focus:ring-orange-500/15 focus:border-orange-500 outline-none transition-all font-bold text-slate-800 text-sm"
                     />
                   )}
                 </div>
 
                 {/* ĐƠN HÀNG PO: NUMERIC FORCED */}
                 <div className="flex flex-col gap-1 sm:gap-1.5">
-                  <label htmlFor="order" className="font-bold text-slate-600 uppercase tracking-wide flex items-center gap-1">
-                    <Tag className="h-3.5 w-3.5 text-emerald-600 shrink-0" />
-                    Đơn hàng (PO)
-                  </label>
+                  <label htmlFor="order" className="sr-only">Đơn hàng (PO)</label>
                   <input 
                     type="text" 
                     id="order" 
                     required 
                     pattern="[0-9]*"
                     inputMode="numeric"
-                    placeholder="Chỉ nhập số" 
+                    placeholder="Đơn hàng PO (Chỉ nhập số)" 
                     value={order} 
                     onChange={handleOrderChange}
                     onFocus={(e) => {
@@ -1068,7 +1034,7 @@ export function QCForm({ user, token, onLogout }: QCFormProps) {
                         e.target.scrollIntoView({ behavior: 'smooth', block: 'center' });
                       }, 300);
                     }}
-                    className="px-3 py-2.5 sm:py-3 border border-slate-200 rounded-lg bg-slate-50 focus:bg-white focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition-all font-mono font-bold text-slate-800 text-sm" 
+                    className="px-3.5 py-3 sm:py-3.5 bg-slate-100/80 border-transparent border rounded-xl hover:bg-slate-100 focus:bg-white focus:ring-4 focus:ring-blue-500/15 focus:border-blue-500 focus:border-transparent outline-none transition-all font-mono font-bold text-slate-800 text-sm" 
                     title="Mã PO bắt buộc là số"
                   />
                 </div>
@@ -1079,13 +1045,7 @@ export function QCForm({ user, token, onLogout }: QCFormProps) {
                 
                 {/* MÃ MÀU: AUTO RESOLVED OR MANUAL */}
                 <div className="flex flex-col gap-1 sm:gap-1.5">
-                  <label htmlFor="colorCode" className="font-bold text-slate-600 uppercase tracking-wide flex items-center gap-1">
-                    <Layers className="h-3.5 w-3.5 text-orange-500 shrink-0" />
-                    Mã màu
-                    {isSearchingColor && (
-                      <Loader2 className="h-3 w-3 text-blue-500 animate-spin ml-1" />
-                    )}
-                  </label>
+                  <label htmlFor="colorCode" className="sr-only">Mã màu</label>
                   {colorConfigList.length > 0 ? (
                     <>
                       <select
@@ -1100,7 +1060,7 @@ export function QCForm({ user, token, onLogout }: QCFormProps) {
                             setColorCode('');
                           }
                         }}
-                        className="px-3 py-2.5 sm:py-3 border border-slate-200 rounded-lg bg-slate-50 focus:bg-white focus:ring-2 focus:ring-blue-500 outline-none transition-all font-semibold text-slate-800 text-sm"
+                        className="px-3.5 py-3 sm:py-3.5 bg-slate-100/80 border-transparent border rounded-xl hover:bg-slate-100 focus:bg-white focus:ring-4 focus:ring-blue-500/15 focus:border-blue-500 outline-none transition-all font-semibold text-slate-800 text-sm"
                       >
                         <option value="" disabled>-- Chọn mã màu --</option>
                         {Array.from(new Set(colorConfigList.map(c => c.colorCode))).map(c => (
@@ -1127,20 +1087,14 @@ export function QCForm({ user, token, onLogout }: QCFormProps) {
                       placeholder="Nhập mã màu" 
                       value={colorCode} 
                       onChange={e => setColorCode(e.target.value)} 
-                      className="px-3 py-2.5 sm:py-3 border border-slate-200 rounded-lg bg-slate-50 focus:bg-white focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition-all font-semibold text-slate-800 uppercase text-sm" 
+                      className="px-3.5 py-3 sm:py-3.5 bg-slate-100/80 border-transparent border rounded-xl hover:bg-slate-100 focus:bg-white focus:ring-4 focus:ring-blue-500/15 focus:border-blue-500 focus:border-transparent outline-none transition-all font-semibold text-slate-800 uppercase text-sm" 
                     />
                   )}
                 </div>
 
                 {/* XƯỞNG CUNG ỨNG: DROPDOWN CHOSEN */}
                 <div className="flex flex-col gap-1 sm:gap-1.5">
-                  <label htmlFor="supplier" className="font-bold text-slate-600 uppercase tracking-wide flex justify-between gap-1 items-center">
-                    <span className="flex items-center gap-1">
-                      <Factory className="h-3.5 w-3.5 text-indigo-500 shrink-0" />
-                      Xưởng Cung Ứng
-                    </span>
-                    {supplierOption === 'CUSTOM' && <span className="text-orange-600 font-extrabold">[Chế độ tự nhập]</span>}
-                  </label>
+                  <label htmlFor="supplier" className="sr-only">Xưởng cung ứng</label>
                   <select
                     id="supplier"
                     required
@@ -1153,9 +1107,9 @@ export function QCForm({ user, token, onLogout }: QCFormProps) {
                         setSupplier('');
                       }
                     }}
-                    className="px-3 py-2.5 sm:py-3 border border-slate-205 rounded-lg bg-slate-50 focus:bg-white focus:ring-2 focus:ring-blue-500 outline-none transition-all font-semibold text-slate-800 text-sm"
+                    className="px-3.5 py-3 sm:py-3.5 bg-slate-100/80 border-transparent border rounded-xl hover:bg-slate-100 focus:bg-white focus:ring-4 focus:ring-blue-500/15 focus:border-blue-500 outline-none transition-all font-semibold text-slate-800 text-sm"
                   >
-                    <option value="" disabled>-- Chọn xưởng --</option>
+                    <option value="" disabled>Xưởng cung ứng (-- Chọn xưởng --)</option>
                     {supplierOptions.map((supplierName) => (
                       <option key={supplierName} value={supplierName}>
                         {supplierName}
@@ -1171,7 +1125,7 @@ export function QCForm({ user, token, onLogout }: QCFormProps) {
                       placeholder="Nhập tên xưởng mới..."
                       value={supplier}
                       onChange={e => setSupplier(e.target.value)}
-                      className="mt-1.5 px-3 py-2.5 border-2 border-orange-200 rounded-lg bg-orange-50 focus:bg-white focus:border-orange-400 focus:ring-2 focus:ring-orange-200 outline-none transition-all font-bold text-slate-800 text-sm"
+                      className="mt-1.5 px-3 py-2.5 bg-orange-50 border-orange-200 border-2 rounded-xl focus:bg-white focus:ring-4 focus:ring-orange-500/15 focus:border-orange-500 outline-none transition-all font-bold text-slate-800 text-sm"
                     />
                   )}
                 </div>
@@ -1179,10 +1133,7 @@ export function QCForm({ user, token, onLogout }: QCFormProps) {
 
               {/* TÊN LOẠI LỖI KỸ THUẬT: DROPDOWN OR ADD NEW */}
               <div className="flex flex-col gap-1 sm:gap-1.5 text-xs">
-                <label htmlFor="errorDropdown" className="font-bold text-slate-600 uppercase tracking-wide flex justify-between">
-                  <span>Tên lỗi</span>
-                  {errorOption === 'CUSTOM' && <span className="text-orange-600 font-extrabold">[Chế độ tự nhập]</span>}
-                </label>
+                <label htmlFor="errorDropdown" className="sr-only">Tên lỗi</label>
                 
                 <select
                   id="errorDropdown"
@@ -1192,7 +1143,7 @@ export function QCForm({ user, token, onLogout }: QCFormProps) {
                     setErrorOption(e.target.value);
                     if (e.target.value !== 'CUSTOM') setCustomErrorInput('');
                   }}
-                  className="px-3 py-2.5 sm:py-3 border border-slate-205 rounded-lg bg-slate-50 focus:bg-white focus:ring-2 focus:ring-blue-500 outline-none transition-all font-semibold text-slate-800 text-sm"
+                  className="px-3.5 py-3 sm:py-3.5 bg-slate-100/80 border-transparent border rounded-xl hover:bg-slate-100 focus:bg-white focus:ring-4 focus:ring-blue-500/15 focus:border-blue-500 outline-none transition-all font-semibold text-slate-800 text-sm"
                 >
                   <option value="">-- Chọn loại lỗi đang bị --</option>
                   {errorOptions.map((eName) => (
@@ -1210,47 +1161,33 @@ export function QCForm({ user, token, onLogout }: QCFormProps) {
                     placeholder="Nhập chi tiết tên lỗi kỹ thuật mới..."
                     value={customErrorInput}
                     onChange={e => setCustomErrorInput(e.target.value)}
-                    className="mt-1 px-3 py-2.5 sm:py-3 border border-blue-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none transition-all font-semibold bg-blue-50/20 text-slate-805 text-sm animate-in slide-in-from-top-1.5 duration-150"
+                    className="mt-1 px-3.5 py-3 sm:py-3.5 border border-blue-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none transition-all font-semibold bg-blue-50/20 text-slate-805 text-sm animate-in slide-in-from-top-1.5 duration-150"
                   />
                 )}
               </div>
 
               {/* GHI CHÚ CHI TIẾT */}
               <div className="flex flex-col gap-1 sm:gap-1.5 text-xs">
-                <label htmlFor="note" className="font-bold text-slate-600 uppercase tracking-wide flex items-center gap-1 mt-1">
-                  <FileText className="h-3.5 w-3.5 text-slate-500 shrink-0" />
-                  Ghi chú chi tiết vấn đề
-                </label>
+                <label htmlFor="note" className="sr-only">Ghi chú chi tiết vấn đề</label>
                 <textarea
                   id="note"
-                  placeholder="Mô tả cụ thể vấn đề hoặc hướng xử lý (không bắt buộc)..."
+                  placeholder="Ghi chú chi tiết vấn đề (Mô tả cụ thể hoặc hướng xử lý, không bắt buộc)..."
                   value={note}
                   onChange={e => setNote(e.target.value)}
                   rows={2}
-                  className="px-3 py-2.5 sm:py-3 border border-slate-205 rounded-lg bg-slate-50 focus:bg-white focus:ring-2 focus:ring-blue-500 outline-none transition-all text-slate-800 text-sm resize-y min-h-[60px]"
+                  className="px-3.5 py-3 sm:py-3.5 bg-slate-100/80 border-transparent border rounded-xl hover:bg-slate-100 focus:bg-white focus:ring-4 focus:ring-blue-500/15 focus:border-blue-500 outline-none transition-all text-slate-800 text-sm resize-y min-h-[80px]"
                 />
               </div>
 
-              <div className="bg-slate-50 rounded-lg p-3 border border-slate-200 mt-2">
-                <div className="text-[11px] font-bold text-slate-600 mb-1 flex items-center gap-1">
-                  <CheckCircle className="h-3 w-3.5 text-emerald-500" />
-                  Mẫu đặt tên thông minh
-                </div>
-                <div className="text-[10px] text-slate-500 leading-normal">
-                  File ảnh tải lên sẽ tự động đổi tên thành <strong>[Bộ_vị]_[Đơn_hàng]_[Mã_màu]_[Tên_lỗi]_[Xưởng]_[Lầu]...jpg</strong> để phục vụ lưu trữ khoa học.
-                </div>
-              </div>
+              
             </section>
 
             {/* Upload Card */}
-            <section className="bg-white rounded-xl border border-slate-200 p-5 flex flex-col gap-4 lg:overflow-hidden min-h-[500px] shadow-sm">
-              <div className="flex justify-between items-center border-b border-slate-100 pb-3 shrink-0">
-                <h2 className="m-0 text-base font-extrabold text-slate-800 uppercase tracking-tight">Hình ảnh minh chứng (QC Photos)</h2>
-                <span className="text-xs text-slate-500 font-semibold bg-slate-100 px-2.5 py-0.5 rounded-full">Đã chọn {files.length} ảnh</span>
-              </div>
+            <section className="bg-white rounded-2xl border border-slate-100/80 shadow-[0_2px_12px_-4px_rgba(0,0,0,0.06)] p-5 flex flex-col gap-4 lg:overflow-hidden min-h-[500px] shadow-sm">
+              
 
               {success && (
-                <div className="rounded-xl bg-emerald-50 p-4 border border-emerald-200 flex flex-col gap-1.5 shrink-0 animate-in zoom-in-95 duration-200">
+                <div className="rounded-2xl bg-emerald-50 p-4 border border-emerald-100 shadow-sm shadow-emerald-500/5 flex flex-col gap-1.5 shrink-0 animate-in zoom-in-95 duration-200">
                   <div className="flex items-center gap-2">
                     <CheckCircle className="h-4.5 w-4.5 text-emerald-500 shrink-0" />
                     <span className="text-sm font-bold text-emerald-800">Đã gửi báo cáo thành công!</span>
@@ -1270,7 +1207,7 @@ export function QCForm({ user, token, onLogout }: QCFormProps) {
 
               <label
                 htmlFor="file-upload"
-                className="border-2 border-dashed border-slate-350 bg-slate-50/50 hover:border-blue-500 hover:bg-blue-50/30 cursor-pointer rounded-xl p-6 sm:p-8 text-center transition-all shrink-0"
+                className="border-2 border-dashed border-slate-350 bg-[#F8FAFC]/50 hover:border-blue-500 hover:bg-blue-50/30 cursor-pointer rounded-xl p-6 sm:p-8 text-center transition-all shrink-0"
               >
                 <div className="flex flex-col items-center justify-center space-y-2 select-none">
                   <div className="text-3xl font-light text-slate-400 hover:text-blue-500 mb-1">+</div>
@@ -1319,12 +1256,12 @@ export function QCForm({ user, token, onLogout }: QCFormProps) {
           </form>
         </main>
 
-     <main onScroll={handleScroll} className={`flex-1 overflow-y-auto md:overflow-hidden pt-[64px] md:pt-0 pb-32 md:pb-0 bg-slate-50 ${activeTab === 'history' ? 'flex flex-col' : 'hidden'}`}>
+     <main onScroll={handleScroll} className={`flex-1 overflow-y-auto md:overflow-hidden pt-[64px] md:pt-0 pb-32 md:pb-0 bg-[#F8FAFC] ${activeTab === 'history' ? 'flex flex-col' : 'hidden'}`}>
         <QCHistory user={user} token={token} userProfile={userProfile} onNavigateToCreate={handleNavigateToCreate} isActive={activeTab === 'history'} />
       </main>
 
       {isAdmin && (
-        <main onScroll={handleScroll} className={`flex-1 overflow-y-auto md:overflow-hidden pt-[64px] md:pt-0 pb-32 md:pb-0 bg-slate-50 ${activeTab === 'admin' ? 'flex flex-col' : 'hidden'}`}>
+        <main onScroll={handleScroll} className={`flex-1 overflow-y-auto md:overflow-hidden pt-[64px] md:pt-0 pb-32 md:pb-0 bg-[#F8FAFC] ${activeTab === 'admin' ? 'flex flex-col' : 'hidden'}`}>
           <AdminPanel onMappingChange={loadConfiguration} />
         </main>
       )}
@@ -1334,7 +1271,7 @@ export function QCForm({ user, token, onLogout }: QCFormProps) {
         <button
           type="button"
           onClick={() => setActiveTab('create')}
-          className={`flex items-center justify-center p-2 rounded-full cursor-pointer border-none bg-transparent select-none transition-all ${activeTab === 'create' ? 'text-blue-400 font-extrabold scale-110 bg-blue-900/30' : 'text-slate-400 hover:text-white'}`}
+          className={`flex items-center justify-center p-2 rounded-full cursor-pointer border-none bg-transparent select-none transition-all ${activeTab === 'create' ? 'text-blue-600 font-extrabold scale-110 bg-blue-50' : 'text-slate-400 hover:text-blue-600'}`}
         >
           <PlusCircle className="h-6 w-6" />
         </button>
@@ -1342,7 +1279,7 @@ export function QCForm({ user, token, onLogout }: QCFormProps) {
         <button
           type="button"
           onClick={() => setActiveTab('history')}
-          className={`flex items-center justify-center p-2 rounded-full cursor-pointer border-none bg-transparent select-none transition-all ${activeTab === 'history' ? 'text-blue-400 font-extrabold scale-110 bg-blue-900/30' : 'text-slate-400 hover:text-white'}`}
+          className={`flex items-center justify-center p-2 rounded-full cursor-pointer border-none bg-transparent select-none transition-all ${activeTab === 'history' ? 'text-blue-600 font-extrabold scale-110 bg-blue-50' : 'text-slate-400 hover:text-blue-600'}`}
         >
           <History className="h-6 w-6" />
         </button>
@@ -1351,7 +1288,7 @@ export function QCForm({ user, token, onLogout }: QCFormProps) {
           <button
             type="button"
             onClick={() => setActiveTab('admin')}
-            className={`flex items-center justify-center p-2 rounded-full cursor-pointer border-none bg-transparent select-none transition-all ${activeTab === 'admin' ? 'text-blue-400 font-extrabold scale-110 bg-blue-900/30' : 'text-slate-400 hover:text-white'}`}
+            className={`flex items-center justify-center p-2 rounded-full cursor-pointer border-none bg-transparent select-none transition-all ${activeTab === 'admin' ? 'text-blue-600 font-extrabold scale-110 bg-blue-50' : 'text-slate-400 hover:text-blue-600'}`}
           >
             <Settings className="h-6 w-6" />
           </button>

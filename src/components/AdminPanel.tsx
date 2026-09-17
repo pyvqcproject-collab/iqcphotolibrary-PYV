@@ -989,17 +989,17 @@ export const AdminPanel = React.memo(function AdminPanel({ onMappingChange }: Ad
   };
 
   return (
-    <div className="md:h-full flex flex-col bg-slate-50 md:overflow-hidden">
+    <div className="md:h-full flex flex-col bg-[#F8FAFC] md:overflow-hidden">
       {/* Sub Header & Tabs inside AdminPanel */}
       <h1 className="hidden">Admin Panel</h1>
-      <div className="bg-white border-b border-slate-200 px-6 py-4 flex flex-col md:flex-row md:items-center md:justify-between shrink-0 gap-3">
+      <div className="bg-white border-b border-slate-100/80 px-6 py-4 flex flex-col md:flex-row md:items-center md:justify-between shrink-0 gap-3">
         <div className="flex items-center gap-2">
           <ShieldCheck className="h-5 w-5 text-blue-600" />
           <h2 className="text-base font-extrabold text-slate-800 tracking-tight uppercase">Trung tâm quản trị dữ liệu QC (ADMIN)</h2>
         </div>
         
         {/* Sub tabs switcher */}
-        <div className="flex bg-slate-100 p-1 rounded-lg border border-slate-200 text-xs text-nowrap overflow-x-auto">
+        <div className="flex bg-slate-100 p-1 rounded-lg border border-slate-100/80 text-xs text-nowrap overflow-x-auto">
           <button
             type="button"
             onClick={() => { setSubTab('users'); setAdminError(''); setAdminSuccess(''); }}
@@ -1058,7 +1058,7 @@ export const AdminPanel = React.memo(function AdminPanel({ onMappingChange }: Ad
           <div className="max-w-6xl mx-auto grid grid-cols-1 lg:grid-cols-[380px_1fr] gap-6 items-start">
             
             {/* User Form Card */}
-            <div className="bg-white rounded-xl border border-slate-200 p-5 shadow-sm space-y-4">
+            <div className="bg-white rounded-xl border border-slate-100/80 p-5 shadow-sm space-y-4">
               <div className="border-b border-slate-100 pb-2">
                 <h3 className="text-sm font-extrabold text-slate-800 uppercase tracking-wider flex items-center gap-1.5">
                   {editingEmail ? <Edit className="h-4 w-4 text-orange-500" /> : <Plus className="h-4 w-4 text-blue-500" />}
@@ -1079,7 +1079,7 @@ export const AdminPanel = React.memo(function AdminPanel({ onMappingChange }: Ad
                     placeholder="VD: pyvqcproject@gmail.com"
                     value={userEmail}
                     onChange={(e) => setUserEmail(e.target.value)}
-                    className="w-full p-2.5 border border-slate-200 rounded-lg bg-slate-50 focus:bg-white focus:ring-2 focus:ring-blue-500 outline-none transition-all font-semibold text-slate-700 disabled:opacity-50"
+                    className="w-full p-2.5 border border-slate-100/80 rounded-lg bg-[#F8FAFC] focus:bg-white focus:ring-2 focus:ring-blue-500 outline-none transition-all font-semibold text-slate-700 disabled:opacity-50"
                   />
                 </div>
 
@@ -1091,7 +1091,7 @@ export const AdminPanel = React.memo(function AdminPanel({ onMappingChange }: Ad
                     placeholder="VD: Nguyễn Văn A"
                     value={userName}
                     onChange={(e) => setUserName(e.target.value)}
-                    className="w-full p-2.5 border border-slate-200 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none transition-all font-semibold text-slate-800"
+                    className="w-full p-2.5 border border-slate-100/80 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none transition-all font-semibold text-slate-800"
                   />
                 </div>
 
@@ -1103,7 +1103,7 @@ export const AdminPanel = React.memo(function AdminPanel({ onMappingChange }: Ad
                     placeholder="VD: K73-04"
                     value={userEmployeeId}
                     onChange={(e) => setUserEmployeeId(e.target.value)}
-                    className="w-full p-2.5 border border-slate-200 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none transition-all font-mono font-bold uppercase text-slate-800"
+                    className="w-full p-2.5 border border-slate-100/80 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none transition-all font-mono font-bold uppercase text-slate-800"
                   />
                 </div>
 
@@ -1114,7 +1114,7 @@ export const AdminPanel = React.memo(function AdminPanel({ onMappingChange }: Ad
                     placeholder="VD: K73F"
                     value={userFloorGroup}
                     onChange={(e) => setUserFloorGroup(e.target.value)}
-                    className="w-full p-2.5 border border-slate-200 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none transition-all font-bold text-slate-805"
+                    className="w-full p-2.5 border border-slate-100/80 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none transition-all font-bold text-slate-805"
                   />
                 </div>
 
@@ -1124,7 +1124,7 @@ export const AdminPanel = React.memo(function AdminPanel({ onMappingChange }: Ad
                     <select
                       value={userRole}
                       onChange={(e) => setUserRole(e.target.value as 'admin' | 'user')}
-                      className="w-full p-2.5 border border-slate-200 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none transition-all font-bold text-slate-800 bg-white"
+                      className="w-full p-2.5 border border-slate-100/80 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none transition-all font-bold text-slate-800 bg-white"
                     >
                       <option value="user">User (Chỉ truy cập lầu cho phép)</option>
                       <option value="admin">Admin (Toàn quyền)</option>
@@ -1135,7 +1135,7 @@ export const AdminPanel = React.memo(function AdminPanel({ onMappingChange }: Ad
                     <label className="font-bold text-slate-600 block uppercase tracking-wide">Bộ vị</label>
                     <div 
                       onClick={() => setPartDropdownOpen(!partDropdownOpen)}
-                      className="w-full p-2.5 border border-slate-200 rounded-lg focus-within:ring-2 focus-within:ring-blue-500 outline-none transition-all font-bold text-slate-800 bg-white cursor-pointer flex justify-between items-center"
+                      className="w-full p-2.5 border border-slate-100/80 rounded-lg focus-within:ring-2 focus-within:ring-blue-500 outline-none transition-all font-bold text-slate-800 bg-white cursor-pointer flex justify-between items-center"
                     >
                       <span className="truncate pr-2">
                         {userParts.length === 0 ? '-- Không chỉ định --' : userParts.join(', ')}
@@ -1143,9 +1143,9 @@ export const AdminPanel = React.memo(function AdminPanel({ onMappingChange }: Ad
                       <ChevronDown className="h-4 w-4 text-slate-500 shrink-0" />
                     </div>
                     {partDropdownOpen && (
-                      <div className="absolute top-full left-0 mt-1 w-full bg-white border border-slate-200 rounded-lg shadow-lg z-50 overflow-hidden">
+                      <div className="absolute top-full left-0 mt-1 w-full bg-white border border-slate-100/80 rounded-lg shadow-lg z-50 overflow-hidden">
                         {['ĐẾ THÔ', 'ĐẾ PHUN SƠN', 'MẶT GIÀY'].map(pt => (
-                          <label key={pt} className="flex items-center gap-3 p-3 hover:bg-slate-50 cursor-pointer border-b border-slate-100 last:border-0">
+                          <label key={pt} className="flex items-center gap-3 p-3 hover:bg-[#F8FAFC] cursor-pointer border-b border-slate-100 last:border-0">
                             <input
                               type="checkbox"
                               checked={userParts.includes(pt)}
@@ -1173,7 +1173,7 @@ export const AdminPanel = React.memo(function AdminPanel({ onMappingChange }: Ad
                     placeholder="K73A, K73B, K73C, K73D"
                     value={userPermittedFloorsStr}
                     onChange={(e) => setUserPermittedFloorsStr(e.target.value)}
-                    className="w-full p-2.5 border border-slate-200 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none transition-all font-extrabold text-slate-800 tracking-wide"
+                    className="w-full p-2.5 border border-slate-100/80 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none transition-all font-extrabold text-slate-800 tracking-wide"
                   />
                   <span className="text-[10px] text-slate-450 italic leading-snug block">
                     Ví dụ khi gõ <strong>K73A, K73B, K73C, K73D</strong>, nhân viên này sẽ CHỈ được phép chọn 1 trong 4 lầu trên khi báo lỗi.
@@ -1194,7 +1194,7 @@ export const AdminPanel = React.memo(function AdminPanel({ onMappingChange }: Ad
                     <button
                       type="button"
                       onClick={resetUserForm}
-                      className="bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold py-2 px-3 rounded-lg flex items-center justify-center cursor-pointer border border-slate-200"
+                      className="bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold py-2 px-3 rounded-lg flex items-center justify-center cursor-pointer border border-slate-100/80"
                     >
                       <Undo2 className="h-4 w-4" />
                     </button>
@@ -1204,8 +1204,8 @@ export const AdminPanel = React.memo(function AdminPanel({ onMappingChange }: Ad
             </div>
 
             {/* Users Directory Table */}
-            <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden flex flex-col min-h-[400px]">
-              <div className="bg-slate-550 border-b border-slate-200 px-5 py-3 flex items-center justify-between">
+            <div className="bg-white rounded-xl border border-slate-100/80 shadow-sm overflow-hidden flex flex-col min-h-[400px]">
+              <div className="bg-slate-550 border-b border-slate-100/80 px-5 py-3 flex items-center justify-between">
                 <span className="text-xs font-extrabold text-slate-700 tracking-wider flex items-center gap-1.5 uppercase">
                   <Users className="h-4.5 w-4.5 text-blue-500" />
                   DANH SÁCH NHÂN SỰ QC & PHÂN QUYỀN LẦU ({users.length})
@@ -1227,7 +1227,7 @@ export const AdminPanel = React.memo(function AdminPanel({ onMappingChange }: Ad
                 <div className="overflow-x-auto">
                   <table className="w-full text-left border-collapse text-xs">
                     <thead>
-                      <tr className="bg-slate-50 text-slate-500 border-b border-slate-250 font-extrabold uppercase">
+                      <tr className="bg-[#F8FAFC] text-slate-500 border-b border-slate-250 font-extrabold uppercase">
                         <th className="p-3.5 pl-5">Thông Tin Tài Khoản</th>
                         <th className="p-3.5">Mã NV</th>
                         <th className="p-3.5">Bộ Vị</th>
@@ -1239,13 +1239,13 @@ export const AdminPanel = React.memo(function AdminPanel({ onMappingChange }: Ad
                     </thead>
                     <tbody className="divide-y divide-slate-100 font-medium text-slate-700">
                       {users.map((u) => (
-                        <tr key={u.email} className="hover:bg-slate-50/50 transition-colors">
+                        <tr key={u.email} className="hover:bg-[#F8FAFC]/50 transition-colors">
                           <td className="p-3.5 pl-5">
                             <div className="font-extrabold text-slate-800 text-[13px]">{u.name}</div>
                             <div className="text-[11px] text-slate-400 font-mono tracking-tight lowercase mt-0.5">{u.email}</div>
                           </td>
                           <td className="p-3.5">
-                            <span className="font-mono bg-slate-100 text-slate-700 px-2 py-0.5 rounded font-bold border border-slate-200">
+                            <span className="font-mono bg-slate-100 text-slate-700 px-2 py-0.5 rounded font-bold border border-slate-100/80">
                               {u.employeeId}
                             </span>
                           </td>
@@ -1272,7 +1272,7 @@ export const AdminPanel = React.memo(function AdminPanel({ onMappingChange }: Ad
                                 Admin
                               </span>
                             ) : (
-                              <span className="font-bold bg-slate-100 text-slate-600 px-2 py-0.5 rounded border border-slate-200 text-[10px] uppercase">
+                              <span className="font-bold bg-slate-100 text-slate-600 px-2 py-0.5 rounded border border-slate-100/80 text-[10px] uppercase">
                                 User
                               </span>
                             )}
@@ -1296,7 +1296,7 @@ export const AdminPanel = React.memo(function AdminPanel({ onMappingChange }: Ad
                             <button
                               type="button"
                               onClick={() => startEditUser(u)}
-                              className="p-1 px-2 border border-slate-200 hover:border-orange-200 hover:bg-orange-50 text-slate-500 hover:text-orange-700 rounded-md cursor-pointer transition-all"
+                              className="p-1 px-2 border border-slate-100/80 hover:border-orange-200 hover:bg-orange-50 text-slate-500 hover:text-orange-700 rounded-md cursor-pointer transition-all"
                               title="Sửa phân quyền"
                             >
                               <Edit className="h-3 w-3 inline" />
@@ -1304,7 +1304,7 @@ export const AdminPanel = React.memo(function AdminPanel({ onMappingChange }: Ad
                             <button
                               type="button"
                               onClick={() => confirmDeleteUser(u.email)}
-                              className="p-1 px-2 border border-slate-200 hover:border-red-200 hover:bg-red-50 text-slate-500 hover:text-red-700 rounded-md cursor-pointer transition-all"
+                              className="p-1 px-2 border border-slate-100/80 hover:border-red-200 hover:bg-red-50 text-slate-500 hover:text-red-700 rounded-md cursor-pointer transition-all"
                               title="Xóa tài khoản"
                             >
                               <Trash2 className="h-3 w-3 inline" />
@@ -1328,7 +1328,7 @@ export const AdminPanel = React.memo(function AdminPanel({ onMappingChange }: Ad
             <div className="space-y-6">
               
               {/* Single Mapping Add Card */}
-              <div className="bg-white rounded-xl border border-slate-200 p-5 shadow-sm space-y-4">
+              <div className="bg-white rounded-xl border border-slate-100/80 p-5 shadow-sm space-y-4">
                 <div className="border-b border-slate-100 pb-2">
                   <h3 className="text-sm font-extrabold text-slate-800 uppercase tracking-wider flex items-center gap-1.5">
                     <Hash className="h-4.5 w-4.5 text-blue-600" />
@@ -1350,7 +1350,7 @@ export const AdminPanel = React.memo(function AdminPanel({ onMappingChange }: Ad
                         placeholder="VD: 9811"
                         value={poNo}
                         onChange={(e) => setPoNo(e.target.value.replace(/[^0-9]/g, ''))}
-                        className="w-full p-2.5 border border-slate-200 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none font-extrabold text-slate-800"
+                        className="w-full p-2.5 border border-slate-100/80 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none font-extrabold text-slate-800"
                         title="Vui lòng chỉ nhập số"
                       />
                     </div>
@@ -1363,7 +1363,7 @@ export const AdminPanel = React.memo(function AdminPanel({ onMappingChange }: Ad
                         placeholder="VD: RED-22"
                         value={poColor}
                         onChange={(e) => setPoColor(e.target.value)}
-                        className="w-full p-2.5 border border-slate-200 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none font-bold uppercase text-slate-800"
+                        className="w-full p-2.5 border border-slate-100/80 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none font-bold uppercase text-slate-800"
                       />
                     </div>
                   </div>
@@ -1380,7 +1380,7 @@ export const AdminPanel = React.memo(function AdminPanel({ onMappingChange }: Ad
               </div>
 
               {/* Bulk Mapping Paste Card */}
-              <div className="bg-white rounded-xl border border-slate-200 p-5 shadow-sm space-y-4">
+              <div className="bg-white rounded-xl border border-slate-100/80 p-5 shadow-sm space-y-4">
                 <div className="border-b border-slate-100 pb-2">
                   <h3 className="text-sm font-extrabold text-slate-800 uppercase tracking-wider flex items-center gap-1.5">
                     <FileSpreadsheet className="h-4.5 w-4.5 text-emerald-600" />
@@ -1397,10 +1397,10 @@ export const AdminPanel = React.memo(function AdminPanel({ onMappingChange }: Ad
                     placeholder="123456   BLUE-01&#10;789012   NAVY-RED-FF&#10;555222   CHARCOAL"
                     value={bulkText}
                     onChange={(e) => setBulkText(e.target.value)}
-                    className="w-full p-2.5 border border-slate-200 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none font-mono font-bold leading-relaxed bg-slate-50 focus:bg-white text-slate-750 placeholder:text-slate-350"
+                    className="w-full p-2.5 border border-slate-100/80 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none font-mono font-bold leading-relaxed bg-[#F8FAFC] focus:bg-white text-slate-750 placeholder:text-slate-350"
                   />
                   
-                  <div className="text-[10px] text-slate-450 leading-relaxed space-y-1 bg-slate-50 p-2.5 rounded border border-slate-150">
+                  <div className="text-[10px] text-slate-450 leading-relaxed space-y-1 bg-[#F8FAFC] p-2.5 rounded border border-slate-150">
                     <div>⚠️ <strong>Cú pháp chuẩn nhận diện:</strong></div>
                     <div>Các dòng dán từ Excel (Po cách màu bằng phím Tab hoặc Khoảng trắng) tự được bóc tách và tạo bản ghi trực tuyến. Cột đơn hàng sẽ tự lọc lấy chữ số.</div>
                   </div>
@@ -1422,8 +1422,8 @@ export const AdminPanel = React.memo(function AdminPanel({ onMappingChange }: Ad
             </div>
 
             {/* Mappings List Directory Table */}
-            <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden flex flex-col min-h-[500px]">
-              <div className="bg-slate-550 border-b border-slate-200 px-5 py-3.5 flex items-center justify-between">
+            <div className="bg-white rounded-xl border border-slate-100/80 shadow-sm overflow-hidden flex flex-col min-h-[500px]">
+              <div className="bg-slate-550 border-b border-slate-100/80 px-5 py-3.5 flex items-center justify-between">
                 <span className="text-xs font-extrabold text-slate-700 tracking-wider flex items-center gap-1.5 uppercase">
                   <Sliders className="h-4.5 w-4.5 text-emerald-500" />
                   DANH SÁCH ĐƠN HÀNG (HIỂN THỊ TỐI ĐA 150 DÒNG | VUI LÒNG DÙNG TÌM KIẾM)
@@ -1456,7 +1456,7 @@ export const AdminPanel = React.memo(function AdminPanel({ onMappingChange }: Ad
                 <div className="overflow-x-auto max-h-[600px] overflow-y-auto">
                   <table className="w-full text-left border-collapse text-xs">
                     <thead>
-                      <tr className="bg-slate-50 text-slate-500 border-b border-slate-250 font-extrabold uppercase sticky top-0 z-10 shadow-sm">
+                      <tr className="bg-[#F8FAFC] text-slate-500 border-b border-slate-250 font-extrabold uppercase sticky top-0 z-10 shadow-sm">
                         <th className="p-3.5 pl-6">Đơn Hàng (PO Code)</th>
                         <th className="p-3.5">Mã Màu Ánh Xạ</th>
                         <th className="p-3.5 pr-6 text-right">Lệnh gỡ bỏ</th>
@@ -1464,7 +1464,7 @@ export const AdminPanel = React.memo(function AdminPanel({ onMappingChange }: Ad
                     </thead>
                     <tbody className="divide-y divide-slate-100 font-medium text-slate-755 font-mono text-[13px]">
                       {mappings.map((m) => (
-                        <tr key={m.order} className="hover:bg-slate-50/50 transition-colors">
+                        <tr key={m.order} className="hover:bg-[#F8FAFC]/50 transition-colors">
                           <td className="p-3.5 pl-6 font-bold text-blue-700">
                             {m.order}
                           </td>
@@ -1497,13 +1497,13 @@ export const AdminPanel = React.memo(function AdminPanel({ onMappingChange }: Ad
         {/* Cấu Hình Danh Sách */}
         {subTab === 'options' && (
           <div className="max-w-4xl mx-auto space-y-6">
-            <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden text-sm">
-              <div className="p-4 border-b border-slate-100 bg-slate-50 flex flex-col gap-3">
+            <div className="bg-white rounded-2xl shadow-[0_2px_12px_-4px_rgba(0,0,0,0.06)] border border-slate-100/80 overflow-hidden text-sm">
+              <div className="p-4 border-b border-slate-100 bg-[#F8FAFC] flex flex-col gap-3">
                 <h3 className="font-extrabold text-slate-700 flex items-center gap-2 uppercase tracking-wide">
                   <Sliders className="h-4 w-4 text-orange-500" />
                   Quản lý danh sách dùng chung
                 </h3>
-                <div className="flex bg-slate-200/50 p-1 rounded-lg border border-slate-200 overflow-x-auto whitespace-nowrap">
+                <div className="flex bg-slate-200/50 p-1 rounded-lg border border-slate-100/80 overflow-x-auto whitespace-nowrap">
                   <button
                     type="button"
                     onClick={() => handleConfigTabChange('detho')}
@@ -1545,7 +1545,7 @@ export const AdminPanel = React.memo(function AdminPanel({ onMappingChange }: Ad
                       rows={3}
                       value={appFloorsStr}
                       onChange={(e) => setAppFloorsStr(e.target.value)}
-                      className="w-full p-3 border border-slate-200 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none transition-all font-semibold text-slate-800 bg-slate-50 focus:bg-white"
+                      className="w-full p-3 border border-slate-100/80 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none transition-all font-semibold text-slate-800 bg-[#F8FAFC] focus:bg-white"
                       placeholder="VD: K73A, K73B, Lầu 1..."
                     />
                   </div>
@@ -1559,7 +1559,7 @@ export const AdminPanel = React.memo(function AdminPanel({ onMappingChange }: Ad
                       rows={3}
                       value={appSuppliersStr}
                       onChange={(e) => setAppSuppliersStr(e.target.value)}
-                      className="w-full p-3 border border-slate-200 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none transition-all font-semibold text-slate-800 bg-slate-50 focus:bg-white"
+                      className="w-full p-3 border border-slate-100/80 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none transition-all font-semibold text-slate-800 bg-[#F8FAFC] focus:bg-white"
                       placeholder="VD: Xưởng A, Xưởng May 1..."
                     />
                   </div>
@@ -1573,7 +1573,7 @@ export const AdminPanel = React.memo(function AdminPanel({ onMappingChange }: Ad
                       rows={4}
                       value={appErrorsStr}
                       onChange={(e) => setAppErrorsStr(e.target.value)}
-                      className="w-full p-3 border border-slate-200 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none transition-all font-semibold text-slate-800 bg-slate-50 focus:bg-white"
+                      className="w-full p-3 border border-slate-100/80 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none transition-all font-semibold text-slate-800 bg-[#F8FAFC] focus:bg-white"
                       placeholder="VD: Lỗi mũi chỉ, Lỗi lệch tâm..."
                     />
                   </div>
@@ -1622,7 +1622,7 @@ export const AdminPanel = React.memo(function AdminPanel({ onMappingChange }: Ad
       {confirmConfig.isOpen && (
         <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-[100] flex items-center justify-center p-4">
           <div className="bg-white rounded-xl shadow-xl max-w-sm w-full mx-auto overflow-hidden animate-in fade-in zoom-in-95 duration-200">
-            <div className="p-4 border-b border-slate-100 bg-slate-50">
+            <div className="p-4 border-b border-slate-100 bg-[#F8FAFC]">
               <h3 className="font-bold text-slate-800 flex items-center gap-2">
                 <AlertCircle className={`h-5 w-5 ${confirmConfig.type === 'delete_all' ? 'text-red-500' : 'text-amber-500'}`} />
                 {confirmConfig.title}
@@ -1641,7 +1641,7 @@ export const AdminPanel = React.memo(function AdminPanel({ onMappingChange }: Ad
                 </div>
               )}
             </div>
-            <div className="p-3 bg-slate-50 border-t border-slate-100 flex items-center justify-end gap-2">
+            <div className="p-3 bg-[#F8FAFC] border-t border-slate-100 flex items-center justify-end gap-2">
               <button
                 type="button"
                 onClick={() => setConfirmConfig(prev => ({ ...prev, isOpen: false }))}

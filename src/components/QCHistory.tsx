@@ -193,7 +193,7 @@ export function DriveImage({ url, token, className = '', alt = 'Hình ảnh QC',
 
   if (errorSec || !imgSrc) {
     return (
-      <div className={`flex flex-col items-center justify-center bg-slate-50 border border-slate-200 text-slate-400 gap-1 rounded-lg ${className}`}>
+      <div className={`flex flex-col items-center justify-center bg-[#F8FAFC] border border-slate-100 text-slate-400 gap-1 rounded-lg ${className}`}>
         <AlertCircle className="h-4 w-4 text-slate-400" />
         <span className="text-[9px] font-medium leading-none">Lỗi tải ảnh</span>
       </div>
@@ -1135,12 +1135,12 @@ export const QCHistory = React.memo(function QCHistory({ user, token, userProfil
       {/* Left Column (Desktop 2/3) */}
       <div className={`flex-1 flex-col min-w-0 min-h-0 h-auto md:h-full ${selectedReport ? 'hidden lg:flex lg:w-2/3 lg:flex-none' : 'flex w-full'}`}>
         {/* COMPACT TOOLBAR */}
-        <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-2 sm:p-3 mb-3 shrink-0 flex flex-col gap-2.5">
+        <div className="bg-white rounded-2xl border border-slate-100/80 shadow-[0_2px_12px_-4px_rgba(0,0,0,0.06)] shadow-sm p-2 sm:p-3 mb-3 shrink-0 flex flex-col gap-2.5">
           {/* ROW 1: Stats & Filters */}
           <div className="flex flex-col xl:flex-row gap-2.5 items-start xl:items-center justify-between">
             {/* Stats (Compact) */}
             <div className="flex items-center flex-wrap gap-2 text-[11px] font-semibold w-full xl:w-auto">
-              <div className="flex items-center gap-1.5 bg-slate-50 border border-slate-200 px-2.5 py-1.5 rounded-lg flex-1 sm:flex-none justify-center">
+              <div className="flex items-center gap-1.5 bg-[#F8FAFC] border border-slate-100 px-2.5 py-1.5 rounded-lg flex-1 sm:flex-none justify-center">
                 <span className="text-slate-500 uppercase tracking-wider text-[9px]">Tổng:</span>
                 <span className="text-slate-800 text-sm">{reports.length}</span>
               </div>
@@ -1159,7 +1159,7 @@ export const QCHistory = React.memo(function QCHistory({ user, token, userProfil
               <select
                 value={selectedFloor}
                 onChange={e => setSelectedFloor(e.target.value)}
-                className="h-[30px] px-2 border border-slate-200 rounded-md text-[11px] bg-slate-50 outline-none focus:ring-1 focus:ring-blue-500 font-medium text-slate-700 flex-1 min-w-[110px]"
+                className="h-[30px] px-2 border border-slate-100 rounded-md text-[11px] bg-[#F8FAFC] outline-none focus:ring-1 focus:ring-blue-500 font-medium text-slate-700 flex-1 min-w-[110px]"
               >
                 <option value="all">Tất cả khu vực</option>
                 {uniqueFloors.map(floor => (
@@ -1170,7 +1170,7 @@ export const QCHistory = React.memo(function QCHistory({ user, token, userProfil
               <select
                 value={selectedSupplier}
                 onChange={e => setSelectedSupplier(e.target.value)}
-                className="h-[30px] px-2 border border-slate-200 rounded-md text-[11px] bg-slate-50 outline-none focus:ring-1 focus:ring-blue-500 font-medium text-slate-700 flex-1 min-w-[110px]"
+                className="h-[30px] px-2 border border-slate-100 rounded-md text-[11px] bg-[#F8FAFC] outline-none focus:ring-1 focus:ring-blue-500 font-medium text-slate-700 flex-1 min-w-[110px]"
               >
                 <option value="all">Tất cả xưởng</option>
                 {uniqueSuppliers.map(sup => (
@@ -1181,14 +1181,14 @@ export const QCHistory = React.memo(function QCHistory({ user, token, userProfil
               <select
                 value={selectedStatus}
                 onChange={e => setSelectedStatus(e.target.value)}
-                className="h-[30px] px-2 border border-slate-200 rounded-md text-[11px] bg-slate-50 outline-none focus:ring-1 focus:ring-blue-500 font-medium text-slate-700 flex-1 min-w-[110px]"
+                className="h-[30px] px-2 border border-slate-100 rounded-md text-[11px] bg-[#F8FAFC] outline-none focus:ring-1 focus:ring-blue-500 font-medium text-slate-700 flex-1 min-w-[110px]"
               >
                 <option value="all">Tất cả trạng thái</option>
                 <option value="synced">Đã đồng bộ mây</option>
                 <option value="offline">Lưu tạm offline</option>
               </select>
 
-              <div className="flex items-center gap-1 h-[30px] bg-slate-50 border border-slate-200 rounded-md px-2 flex-1 min-w-[180px]">
+              <div className="flex items-center gap-1 h-[30px] bg-[#F8FAFC] border border-slate-100 rounded-md px-2 flex-1 min-w-[180px]">
                 <Calendar className="h-3 w-3 text-slate-400 shrink-0" />
                 <input 
                   type="date" 
@@ -1219,7 +1219,7 @@ export const QCHistory = React.memo(function QCHistory({ user, token, userProfil
                 placeholder="Tìm kiếm nhanh mã đơn, lỗi..." 
                 value={searchQuery}
                 onChange={e => setSearchQuery(e.target.value)}
-                className="w-full pl-8 pr-2 h-[30px] border border-slate-200 rounded-md text-[11px] bg-slate-50 focus:ring-1 focus:ring-blue-500 outline-none font-medium text-slate-700"
+                className="w-full pl-8 pr-2 h-[30px] border border-slate-100 rounded-md text-[11px] bg-[#F8FAFC] focus:ring-1 focus:ring-blue-500 outline-none font-medium text-slate-700"
               />
             </div>
 
@@ -1227,7 +1227,7 @@ export const QCHistory = React.memo(function QCHistory({ user, token, userProfil
             <div className="flex items-center flex-wrap gap-2 w-full sm:w-auto justify-end">
               <button
                 onClick={toggleSortOrder}
-                className="text-[11px] flex items-center justify-center gap-1 text-slate-600 hover:text-slate-800 font-medium bg-slate-50 hover:bg-slate-100 border border-slate-200 px-2 h-[30px] rounded-md transition-all"
+                className="text-[11px] flex items-center justify-center gap-1 text-slate-600 hover:text-slate-800 font-medium bg-[#F8FAFC] hover:bg-slate-100 border border-slate-100 px-2 h-[30px] rounded-md transition-all"
                 title="Sắp xếp theo thời gian"
               >
                 <ArrowUpDown className="h-3 w-3" />
@@ -1294,12 +1294,12 @@ export const QCHistory = React.memo(function QCHistory({ user, token, userProfil
       {/* Reports List */}
       <div className={`flex-1 min-h-0 h-auto md:overflow-y-auto pr-1 flex flex-col gap-3 pb-6 ${selectedReport ? 'hidden lg:flex' : 'flex'}`}>
           {isLoading ? (
-            <div className="flex-1 flex flex-col items-center justify-center py-20 bg-white rounded-xl border border-slate-200">
+            <div className="flex-1 flex flex-col items-center justify-center py-20 bg-white rounded-2xl border border-slate-100/80 shadow-[0_2px_12px_-4px_rgba(0,0,0,0.06)]">
               <RefreshCw className="animate-spin h-8 w-8 text-blue-600 mb-3" />
               <p className="text-sm font-medium text-slate-500">Đang quét tìm báo cáo lưu trữ...</p>
             </div>
           ) : filteredReports.length === 0 ? (
-            <div className="flex-1 flex flex-col items-center justify-center py-16 bg-white rounded-xl border border-slate-200 text-center px-4">
+            <div className="flex-1 flex flex-col items-center justify-center py-16 bg-white rounded-2xl border border-slate-100/80 shadow-[0_2px_12px_-4px_rgba(0,0,0,0.06)] text-center px-4">
               <FileText className="h-12 w-12 text-slate-300 mb-2.5" />
               <p className="text-base font-bold text-slate-600">Không tìm thấy báo cáo nào</p>
               <p className="text-xs text-slate-400 max-w-sm mt-1">
@@ -1321,10 +1321,10 @@ export const QCHistory = React.memo(function QCHistory({ user, token, userProfil
                   setActiveDetailImageIndex(0);
                   setLoadedImageUrls({});
                 }}
-                className={`shrink-0 group border rounded-xl overflow-hidden shadow-sm transition-all p-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 cursor-pointer bg-white ${selectedReport?.id === report.id ? 'border-blue-500 ring-2 ring-blue-500/15' : 'border-slate-200 hover:border-slate-300'}`}
+                className={`shrink-0 group border rounded-xl overflow-hidden shadow-sm transition-all p-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 cursor-pointer bg-white ${selectedReport?.id === report.id ? 'border-blue-500 ring-2 ring-blue-500/20' : 'border-slate-100 hover:border-blue-200 hover:shadow-md'}`}
               >
                 <div className="flex-1 flex items-start gap-3.5">
-                  <div className="h-12 w-12 rounded-lg bg-slate-100 border border-slate-200 overflow-hidden flex items-center justify-center text-slate-500 group-hover:bg-blue-50 group-hover:text-blue-600 transition-all shrink-0 relative shadow-sm">
+                  <div className="h-12 w-12 rounded-lg bg-slate-100 border border-slate-100 overflow-hidden flex items-center justify-center text-slate-500 group-hover:bg-blue-50 group-hover:text-blue-600 transition-all shrink-0 relative shadow-sm">
                     {report.imageUrls && report.imageUrls.length > 0 ? (
                       <DriveImage 
                         url={report.imageUrls[0]} 
@@ -1351,7 +1351,7 @@ export const QCHistory = React.memo(function QCHistory({ user, token, userProfil
                              <CheckCircle className="h-3 w-3" /> Đã tải
                           </span>
                         )}
-                        <span className="text-xs font-bold font-mono text-slate-600 bg-slate-100/80 px-2 py-0.5 rounded border border-slate-200/60">
+                        <span className="text-xs font-bold font-mono text-slate-600 bg-slate-100/80 px-2 py-0.5 rounded border border-slate-100/60">
                           PO: {report.order || 'N/A'}
                         </span>
                         <span className="text-xs font-bold font-mono text-blue-700 bg-blue-50 px-2 py-0.5 rounded border border-blue-100">
@@ -1369,20 +1369,20 @@ export const QCHistory = React.memo(function QCHistory({ user, token, userProfil
                         )}
 
                         {isAdmin && report.employeeId && (
-                          <span className="text-[10px] font-bold text-slate-600 bg-slate-100 border border-slate-200 px-1.5 py-0.5 rounded-full">
+                          <span className="text-[10px] font-bold text-slate-600 bg-slate-100 border border-slate-100 px-1.5 py-0.5 rounded-full">
                             QC: {report.employeeId}
                           </span>
                         )}
                       </div>
                       
                       <div className="flex flex-wrap gap-x-3 gap-y-1.5 text-xs text-slate-600 font-medium">
-                        <span className="flex items-center gap-1.5 bg-slate-50 px-1.5 rounded pr-2 border border-slate-100/50">
+                        <span className="flex items-center gap-1.5 bg-[#F8FAFC] px-1.5 rounded pr-2 border border-slate-100/50">
                           <MapPin className="h-3.5 w-3.5 text-slate-400" /> {report.floor || 'N/A'}
                         </span>
-                        <span className="flex items-center gap-1.5 bg-slate-50 px-1.5 rounded pr-2 border border-slate-100/50">
+                        <span className="flex items-center gap-1.5 bg-[#F8FAFC] px-1.5 rounded pr-2 border border-slate-100/50">
                           <Factory className="h-3.5 w-3.5 text-slate-400" /> {report.supplier || 'N/A'}
                         </span>
-                        <span className="flex items-center gap-1.5 bg-slate-50 px-1.5 rounded pr-2 border border-slate-100/50">
+                        <span className="flex items-center gap-1.5 bg-[#F8FAFC] px-1.5 rounded pr-2 border border-slate-100/50">
                           <Calendar className="h-3.5 w-3.5 text-slate-400" /> {getFriendlyDate(report.date) || 'N/A'}
                         </span>
                       </div>
@@ -1424,31 +1424,31 @@ export const QCHistory = React.memo(function QCHistory({ user, token, userProfil
       <div className={`w-full lg:w-1/3 min-h-0 lg:min-w-[420px] lg:max-w-[480px] flex-col h-auto md:h-full lg:gap-5 ${selectedReport ? 'flex' : 'hidden'}`}>
         
         {/* Selected Details Drawer Pane */}
-        <div className={`bg-white rounded-xl border border-slate-200 shadow-sm flex flex-col overflow-visible lg:overflow-hidden flex-1 min-h-[450px] lg:min-h-0 pb-16 lg:pb-0 ${selectedReport ? 'flex' : 'hidden'}`}>
+        <div className={`bg-white rounded-2xl border border-slate-100/80 shadow-[0_2px_12px_-4px_rgba(0,0,0,0.06)] shadow-sm flex flex-col lg:overflow-hidden flex-1 h-auto lg:h-full lg:min-h-0 ${selectedReport ? 'flex' : 'hidden'}`}>
           {selectedReport ? (
-            <div className="h-full flex flex-col">
+            <div className="flex-1 flex flex-col h-auto lg:h-full lg:overflow-y-auto">
               {/* Header Title */}
-              <div className="p-4 bg-slate-800 text-white shrink-0 flex items-center justify-between">
+              <div className="p-4 bg-white border-b border-slate-100 text-slate-800 shrink-0 flex items-center justify-between">
                 <div>
-                  <div className="text-[10px] text-slate-300 font-bold uppercase tracking-widest flex items-center gap-1 mb-0.5">
+                  <div className="text-[10px] text-slate-500 font-bold uppercase tracking-widest flex items-center gap-1 mb-0.5">
                     {selectedReport.isLocalOnly ? (
-                      <span className="text-amber-400 flex items-center gap-1"><CloudOff className="h-3 w-3" /> BÁO CÁO LƯU TẠM</span>
+                      <span className="text-amber-600 flex items-center gap-1"><CloudOff className="h-3 w-3" /> BÁO CÁO LƯU TẠM</span>
                     ) : (
-                      <span className="text-emerald-400 flex items-center gap-1"><CheckCircle className="h-3 w-3" /> ĐÃ LƯU TRÊN MÂY</span>
+                      <span className="text-emerald-600 flex items-center gap-1"><CheckCircle className="h-3 w-3" /> ĐÃ LƯU TRÊN MÂY</span>
                     )}
                   </div>
                   <h3 className="text-sm font-extrabold line-clamp-1 leading-tight">{selectedReport.errorName}</h3>
                 </div>
                 <button 
                   onClick={() => setSelectedReport(null)}
-                  className="px-2.5 py-1.5 bg-slate-700 hover:bg-slate-600 hover:text-white text-slate-200 rounded-lg text-xs font-extrabold cursor-pointer border-none flex items-center gap-1 shrink-0 transition-colors"
+                  className="px-2.5 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 hover:text-slate-900 rounded-lg text-xs font-extrabold cursor-pointer border-none flex items-center gap-1 shrink-0 transition-colors"
                 >
                   ‹ Quay lại
                 </button>
               </div>
 
               {/* Informative Body */}
-              <div className="flex-1 overflow-visible lg:overflow-y-auto p-5 space-y-5">
+              <div className="flex-1 p-5 space-y-5">
                 {/* Admin/User Error Notification */}
                 {adminActionError && (
                   <div className="rounded-lg bg-red-50 p-3.5 border border-red-200 text-xs text-red-800 font-semibold leading-relaxed flex items-start gap-2.5 shadow-sm animate-in fade-in duration-200">
@@ -1459,20 +1459,11 @@ export const QCHistory = React.memo(function QCHistory({ user, token, userProfil
 
                 {/* Edit & Delete Controls Panel */}
                 {isEditable && !isEditing && !deleteConfirmOpen && (
-                  <div className="bg-slate-50 border border-slate-200 rounded-xl p-3.5 flex flex-col gap-2.5 shadow-sm animate-in slide-in-from-top-3 duration-200">
-                    <div className="flex items-center gap-1.5 text-xs font-extrabold text-slate-700 tracking-wider">
-                      <ShieldCheck className={`h-4.5 w-4.5 ${isAdmin ? 'text-emerald-600' : 'text-blue-600'} shrink-0`} />
-                      QUẢN LÝ BÁO CÁO {isAdmin ? '(QUYỀN QUẢN TRỊ VIÊN)' : '(CỦA BẠN)'}
-                    </div>
-                    
-                    <div className="text-[11px] text-slate-500 leading-snug">
-                      Bạn có quyền thay đổi thông tin biên bản hoặc xóa vĩnh viễn báo cáo chất lượng này.
-                    </div>
-
-                    <div className="flex gap-2 text-xs pt-1">
+                  <div className="animate-in slide-in-from-top-3 duration-200">
+                    <div className="flex gap-2 text-xs">
                       <button
                         onClick={startEditing}
-                        className="flex-1 bg-white hover:bg-slate-50 border border-slate-200 text-slate-800 font-extrabold py-2 px-3 rounded-lg flex items-center justify-center gap-1.5 shadow-sm cursor-pointer transition-all border border-slate-200 hover:border-slate-350"
+                        className="flex-1 bg-white hover:bg-[#F8FAFC] border border-slate-100 text-slate-800 font-extrabold py-2 px-3 rounded-lg flex items-center justify-center gap-1.5 shadow-sm cursor-pointer transition-all border border-slate-100 hover:border-slate-350"
                       >
                         <Pencil className="h-3.5 w-3.5 text-blue-600" />
                         SỬA BÁO CÁO
@@ -1542,8 +1533,8 @@ export const QCHistory = React.memo(function QCHistory({ user, token, userProfil
 
                 {isEditing ? (
                   /* EDITING FORM */
-                  <div className="space-y-4 bg-slate-50 p-4 rounded-xl border border-blue-200 animate-in slide-in-from-right-3 duration-200">
-                    <div className="flex items-center justify-between border-b border-slate-200 pb-2">
+                  <div className="space-y-4 bg-[#F8FAFC] p-4 rounded-xl border border-blue-200 animate-in slide-in-from-right-3 duration-200">
+                    <div className="flex items-center justify-between border-b border-slate-100 pb-2">
                       <div className="flex items-center gap-1.5 text-blue-800 font-extrabold text-xs uppercase tracking-wider">
                         <Pencil className="h-3.5 w-3.5 text-blue-600" />
                         Chỉnh Sửa Biên Bản
@@ -1561,7 +1552,7 @@ export const QCHistory = React.memo(function QCHistory({ user, token, userProfil
                         type="date"
                         value={editDate}
                         onChange={e => setEditDate(e.target.value)}
-                        className="w-full p-2 border border-slate-200 rounded-lg text-sm bg-white focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition-all cursor-pointer font-bold text-slate-800"
+                        className="w-full p-2 bg-[#F8FAFC] border-transparent border rounded-xl hover:bg-slate-100 focus:bg-white focus:ring-4 focus:ring-blue-500/15 focus:border-blue-500 text-sm outline-none transition-all cursor-pointer font-bold text-slate-800"
                       />
                     </div>
 
@@ -1573,7 +1564,7 @@ export const QCHistory = React.memo(function QCHistory({ user, token, userProfil
                         type="text"
                         value={editFloor}
                         onChange={e => setEditFloor(e.target.value)}
-                        className="w-full p-2 border border-slate-200 rounded-lg text-sm bg-white focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition-all text-slate-800 font-bold"
+                        className="w-full p-2 bg-[#F8FAFC] border-transparent border rounded-xl hover:bg-slate-100 focus:bg-white focus:ring-4 focus:ring-blue-500/15 focus:border-blue-500 text-sm outline-none transition-all text-slate-800 font-bold"
                         placeholder="Nhập lầu hoặc khu vực..."
                       />
                     </div>
@@ -1585,7 +1576,7 @@ export const QCHistory = React.memo(function QCHistory({ user, token, userProfil
                         type="text"
                         value={editPart}
                         onChange={e => setEditPart(e.target.value)}
-                        className="w-full p-2 border border-slate-200 rounded-lg text-sm bg-white focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition-all text-slate-800 font-bold"
+                        className="w-full p-2 bg-[#F8FAFC] border-transparent border rounded-xl hover:bg-slate-100 focus:bg-white focus:ring-4 focus:ring-blue-500/15 focus:border-blue-500 text-sm outline-none transition-all text-slate-800 font-bold"
                         placeholder="Nhập bộ vị (Ví dụ: ĐẾ THÔ)..."
                       />
                     </div>
@@ -1598,7 +1589,7 @@ export const QCHistory = React.memo(function QCHistory({ user, token, userProfil
                         type="text"
                         value={editOrder}
                         onChange={e => setEditOrder(e.target.value)}
-                        className="w-full p-2 border border-slate-200 rounded-lg text-sm bg-white font-mono focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition-all font-bold text-slate-800"
+                        className="w-full p-2 border border-slate-100 rounded-lg text-sm bg-white font-mono focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition-all font-bold text-slate-800"
                         placeholder="Nhập mã đơn hàng..."
                       />
                     </div>
@@ -1611,7 +1602,7 @@ export const QCHistory = React.memo(function QCHistory({ user, token, userProfil
                         type="text"
                         value={editColorCode}
                         onChange={e => setEditColorCode(e.target.value)}
-                        className="w-full p-2 border border-slate-200 rounded-lg text-sm bg-white font-mono focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition-all font-bold text-slate-805"
+                        className="w-full p-2 border border-slate-100 rounded-lg text-sm bg-white font-mono focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition-all font-bold text-slate-805"
                         placeholder="Nhập mã màu..."
                       />
                     </div>
@@ -1624,7 +1615,7 @@ export const QCHistory = React.memo(function QCHistory({ user, token, userProfil
                         type="text"
                         value={editErrorName}
                         onChange={e => setEditErrorName(e.target.value)}
-                        className="w-full p-2 border border-slate-200 rounded-lg text-sm bg-white focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition-all font-bold text-slate-805"
+                        className="w-full p-2 bg-[#F8FAFC] border-transparent border rounded-xl hover:bg-slate-100 focus:bg-white focus:ring-4 focus:ring-blue-500/15 focus:border-blue-500 text-sm outline-none transition-all font-bold text-slate-805"
                         placeholder="Nhập tên loại lỗi..."
                       />
                     </div>
@@ -1637,7 +1628,7 @@ export const QCHistory = React.memo(function QCHistory({ user, token, userProfil
                         type="text"
                         value={editSupplier}
                         onChange={e => setEditSupplier(e.target.value)}
-                        className="w-full p-2 border border-slate-200 rounded-lg text-sm bg-white focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition-all font-bold text-slate-805"
+                        className="w-full p-2 bg-[#F8FAFC] border-transparent border rounded-xl hover:bg-slate-100 focus:bg-white focus:ring-4 focus:ring-blue-500/15 focus:border-blue-500 text-sm outline-none transition-all font-bold text-slate-805"
                         placeholder="Nhập xưởng cung ứng..."
                       />
                     </div>
@@ -1650,17 +1641,17 @@ export const QCHistory = React.memo(function QCHistory({ user, token, userProfil
                         value={editNote}
                         onChange={e => setEditNote(e.target.value)}
                         rows={3}
-                        className="w-full p-2 border border-slate-200 rounded-lg text-sm bg-white focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition-all text-slate-800 resize-y"
+                        className="w-full p-2 bg-[#F8FAFC] border-transparent border rounded-xl hover:bg-slate-100 focus:bg-white focus:ring-4 focus:ring-blue-500/15 focus:border-blue-500 text-sm outline-none transition-all text-slate-800 resize-y"
                         placeholder="Mô tả cụ thể vấn đề hoặc hướng xử lý..."
                       />
                     </div>
 
-                    <div className="flex gap-2.5 pt-2 border-t border-slate-200 mt-2">
+                    <div className="flex gap-2.5 pt-2 border-t border-slate-100 mt-2">
                       <button
                         type="button"
                         onClick={handleSaveEdit}
                         disabled={isSavingEdit}
-                        className="flex-1 bg-blue-600 hover:bg-blue-700 disabled:bg-blue-400 text-white font-extrabold text-xs py-2.5 px-3 rounded-lg flex items-center justify-center gap-1.5 cursor-pointer shadow border-none transition-all hover:scale-[1.01]"
+                        className="flex-1 bg-blue-600 hover:bg-blue-700 disabled:bg-blue-400 text-white font-extrabold text-xs py-2.5 px-3 rounded-xl active:scale-[0.98] flex items-center justify-center gap-1.5 cursor-pointer shadow border-none transition-all hover:scale-[1.01]"
                       >
                         <Save className="h-4 w-4" />
                         {isSavingEdit ? 'Đang lưu...' : 'LƯU THAY ĐỔI'}
@@ -1670,7 +1661,7 @@ export const QCHistory = React.memo(function QCHistory({ user, token, userProfil
                         type="button"
                         onClick={() => { setIsEditing(false); setAdminActionError(''); }}
                         disabled={isSavingEdit}
-                        className="bg-white hover:bg-slate-100 border border-slate-200 text-slate-700 font-extrabold text-xs py-2.5 px-3 rounded-lg flex items-center justify-center gap-1.5 cursor-pointer transition-all"
+                        className="bg-white hover:bg-slate-100 border border-slate-100 text-slate-700 font-extrabold text-xs py-2.5 px-3 rounded-lg flex items-center justify-center gap-1.5 cursor-pointer transition-all"
                       >
                         <Undo2 className="h-4 w-4 text-slate-500" />
                         HỦY
@@ -1681,39 +1672,26 @@ export const QCHistory = React.memo(function QCHistory({ user, token, userProfil
                   /* VIEW MODE */
                   <>
                     {/* Visual Metadata Fields Grid */}
-                    <div className="grid grid-cols-2 gap-4">
-                      <div className="bg-slate-50 p-3 rounded-lg border border-slate-100 flex flex-col">
-                        <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider flex items-center gap-1 mb-1">
-                          <Calendar className="h-3 w-3 text-slate-400" /> Ngày Báo Cáo
-                        </span>
-                        <span className="text-sm font-bold text-slate-700">{getFriendlyDate(selectedReport.date)}</span>
-                      </div>
-
-                      <div className="bg-slate-50 p-3 rounded-lg border border-slate-100 flex flex-col">
-                        <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider flex items-center gap-1 mb-1">
-                          <MapPin className="h-3 w-3 text-slate-400" /> Lầu / Khu Vực
-                        </span>
-                        <span className="text-sm font-bold text-slate-700">{selectedReport.floor}</span>
+                    <div className="grid grid-cols-2 bg-[#F8FAFC] border border-slate-100 rounded-xl overflow-hidden divide-y divide-slate-100">
+                      <div className="flex divide-x divide-slate-100 col-span-2">
+                        <div className="p-3 flex-1 flex items-center justify-center text-center">
+                          <span className="text-sm font-bold text-slate-700">{getFriendlyDate(selectedReport.date)}</span>
+                        </div>
+                        <div className="p-3 flex-1 flex items-center justify-center text-center">
+                          <span className="text-sm font-bold text-slate-700">{selectedReport.floor}</span>
+                        </div>
                       </div>
                       
-                      <div className="bg-slate-50 p-3 rounded-lg border border-slate-100 flex flex-col">
-                        <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider flex items-center gap-1 mb-1">
-                          <Layers className="h-3 w-3 text-slate-400" /> Bộ Vị
-                        </span>
-                        <span className="text-sm font-bold text-slate-700">{selectedReport.part || 'Không xác định'}</span>
+                      <div className="flex divide-x divide-slate-100 col-span-2">
+                        <div className="p-3 flex-1 flex items-center justify-center text-center">
+                          <span className="text-sm font-bold text-slate-700">{selectedReport.part || 'Không xác định'}</span>
+                        </div>
+                        <div className="p-3 flex-1 flex items-center justify-center text-center">
+                          <span className="text-sm font-bold text-slate-800 font-mono tracking-wide">{selectedReport.order}</span>
+                        </div>
                       </div>
 
-                      <div className="bg-slate-50 p-3 rounded-lg border border-slate-100 flex flex-col">
-                        <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider flex items-center gap-1 mb-1">
-                          <Tag className="h-3 w-3 text-slate-400" /> Đơn Hàng (PO)
-                        </span>
-                        <span className="text-sm font-bold text-slate-800 font-mono tracking-wide">{selectedReport.order}</span>
-                      </div>
-
-                      <div className="bg-slate-50 p-3 rounded-lg border border-slate-100 flex flex-col">
-                        <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider flex items-center gap-1 mb-1">
-                          <Layers className="h-3 w-3 text-slate-400" /> Mã Màu
-                        </span>
+                      <div className="p-3 col-span-2 flex items-center justify-center text-center">
                         <span className="text-sm font-bold text-slate-700 font-mono">{selectedReport.colorCode}</span>
                       </div>
                     </div>
@@ -1771,7 +1749,7 @@ export const QCHistory = React.memo(function QCHistory({ user, token, userProfil
                     <div className="space-y-3">
                       {/* Large Active Image Preview Container */}
                       <div 
-                        className="relative group h-48 sm:h-56 bg-slate-50 border border-slate-200 rounded-xl overflow-hidden cursor-zoom-in shadow-inner flex items-center justify-center transition-all hover:border-blue-300"
+                        className="relative group h-48 sm:h-56 bg-[#F8FAFC] border border-slate-100 rounded-xl overflow-hidden cursor-zoom-in shadow-inner flex items-center justify-center transition-all hover:border-blue-300"
                         onClick={() => setLightboxIndex(activeDetailImageIndex)}
                         title="Bấm để phóng to ảnh"
                       >
@@ -1808,7 +1786,7 @@ export const QCHistory = React.memo(function QCHistory({ user, token, userProfil
                               key={i}
                               type="button"
                               onClick={() => setActiveDetailImageIndex(i)}
-                              className={`relative h-14 w-14 rounded-lg bg-slate-100 overflow-hidden flex-shrink-0 cursor-pointer transition-all border-2 outline-none ${activeDetailImageIndex === i ? 'border-blue-600 ring-2 ring-blue-500/15 scale-95' : 'border-slate-200 hover:border-slate-350 opacity-70 hover:opacity-100'}`}
+                              className={`relative h-14 w-14 rounded-lg bg-slate-100 overflow-hidden flex-shrink-0 cursor-pointer transition-all border-2 outline-none ${activeDetailImageIndex === i ? 'border-blue-600 ring-2 ring-blue-500/20 scale-95' : 'border-slate-100 hover:border-slate-350 opacity-70 hover:opacity-100'}`}
                             >
                               <DriveImage 
                                 url={url} 
@@ -1872,7 +1850,7 @@ export const QCHistory = React.memo(function QCHistory({ user, token, userProfil
 
                     <button
                       onClick={() => handleDeleteLocalReport(selectedReport.id)}
-                      className="w-full bg-red-50 text-red-600 hover:bg-red-100 border border-slate-200 font-bold text-xs py-2 px-3 rounded-lg text-center cursor-pointer transition-colors"
+                      className="w-full bg-red-50 text-red-600 hover:bg-red-100 border border-slate-100 font-bold text-xs py-2 px-3 rounded-lg text-center cursor-pointer transition-colors"
                     >
                       Xóa cục bộ (Xóa bản nháp)
                     </button>

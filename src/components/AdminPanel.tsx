@@ -29,8 +29,16 @@ import {
   Loader2, 
   AlertCircle,
   Hash,
-  RefreshCw
+  RefreshCw,
+  Layers,
+  Sparkles
 } from 'lucide-react';
+
+export const DEFAULT_SUB_PARTS: Record<string, string[]> = {
+  detho: ['Mặt đế', 'Gót đế', 'Mũi đế', 'Viền đế', 'Đế giữa', 'Đế ngoài', 'Hoa văn đế', 'Chân đế'],
+  deson: ['Sơn viền', 'Sơn mặt đáy', 'Sơn logo', 'Sơn gót', 'Sơn phối màu', 'Sơn phủ bóng', 'Sơn chuyển màu'],
+  matgiay: ['Mũi giày', 'Thân giày', 'Lưỡi gà', 'Cổ giày', 'Gót giày', 'Khoen xỏ dây', 'Lót trong', 'Logo mặt giày']
+};
 
 export interface QCUser {
   email: string;
@@ -39,7 +47,7 @@ export interface QCUser {
   floorGroup: string;
   permittedFloors: string[];
   role?: 'admin' | 'user';
-  part?: 'ĐẾ THÔ' | 'ĐẾ PHUN SƠN' | 'MẶT GIÀY' | '';
+  part?: string;
   parts?: string[];
 }
 
@@ -120,7 +128,8 @@ export const AdminPanel = React.memo(function AdminPanel({ onMappingChange }: Ad
   const [appFloorsStr, setAppFloorsStr] = useState('');
   const [appErrorsStr, setAppErrorsStr] = useState('');
   const [appSuppliersStr, setAppSuppliersStr] = useState('');
-    const [isSavingAppConfig, setIsSavingAppConfig] = useState(false);
+  const [appSubPartsStr, setAppSubPartsStr] = useState('');
+  const [isSavingAppConfig, setIsSavingAppConfig] = useState(false);
   const [loadingAppConfig, setLoadingAppConfig] = useState(true);
 
   // User form state
@@ -385,6 +394,8 @@ export const AdminPanel = React.memo(function AdminPanel({ onMappingChange }: Ad
       setAppFloorsStr((currentData.floors || []).join(', '));
       setAppErrorsStr((currentData.errors || []).join(', '));
       setAppSuppliersStr((currentData.suppliers || []).join(', '));
+      const currentSubParts = currentData.subParts || DEFAULT_SUB_PARTS[configPartTab] || DEFAULT_SUB_PARTS['detho'] || [];
+      setAppSubPartsStr(currentSubParts.join(', '));
             
       if (Object.keys(configData).length > 0) {
         localStorage.setItem('local_app_config', JSON.stringify(configData));
@@ -430,7 +441,8 @@ export const AdminPanel = React.memo(function AdminPanel({ onMappingChange }: Ad
         floors: appFloorsStr.split(',').map(s => s.trim().toUpperCase()).filter(s => s.length > 0),
         errors: appErrorsStr.split(',').map(s => s.trim()).filter(s => s.length > 0),
         suppliers: appSuppliersStr.split(',').map(s => s.trim()).filter(s => s.length > 0),
-              }
+        subParts: appSubPartsStr.split(',').map(s => s.trim()).filter(s => s.length > 0)
+      }
     };
     setFullAppConfig(updatedConfig);
     
@@ -439,6 +451,7 @@ export const AdminPanel = React.memo(function AdminPanel({ onMappingChange }: Ad
     setAppFloorsStr((newData.floors || []).join(', '));
     setAppErrorsStr((newData.errors || []).join(', '));
     setAppSuppliersStr((newData.suppliers || []).join(', '));
+    setAppSubPartsStr((newData.subParts || DEFAULT_SUB_PARTS[newTab] || []).join(', '));
         
     setConfigPartTab(newTab);
   };
@@ -454,6 +467,7 @@ export const AdminPanel = React.memo(function AdminPanel({ onMappingChange }: Ad
       const parsedFloors = appFloorsStr.split(',').map(s => s.trim().toUpperCase()).filter(s => s.length > 0);
       const parsedErrors = appErrorsStr.split(',').map(s => s.trim()).filter(s => s.length > 0);
       const parsedSuppliers = appSuppliersStr.split(',').map(s => s.trim()).filter(s => s.length > 0);
+      const parsedSubParts = appSubPartsStr.split(',').map(s => s.trim()).filter(s => s.length > 0);
       
       const finalConfigToSave = {
         ...fullAppConfig,
@@ -461,7 +475,8 @@ export const AdminPanel = React.memo(function AdminPanel({ onMappingChange }: Ad
           floors: parsedFloors,
           errors: parsedErrors,
           suppliers: parsedSuppliers,
-                  }
+          subParts: parsedSubParts
+        }
       };
       
       setFullAppConfig(finalConfigToSave);
@@ -1570,7 +1585,7 @@ export const AdminPanel = React.memo(function AdminPanel({ onMappingChange }: Ad
                       <span className="text-[10px] text-blue-600">Cách nhau bởi dấu phẩy (,)</span>
                     </label>
                     <textarea
-                      rows={4}
+                      rows={3}
                       value={appErrorsStr}
                       onChange={(e) => setAppErrorsStr(e.target.value)}
                       className="w-full p-3 border border-slate-100/80 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none transition-all font-semibold text-slate-800 bg-[#F8FAFC] focus:bg-white"
@@ -1578,7 +1593,49 @@ export const AdminPanel = React.memo(function AdminPanel({ onMappingChange }: Ad
                     />
                   </div>
 
+                  {/* CẤU HÌNH THÀNH PHẦN NHỎ / CHI TIẾT BỘ VỊ */}
+                  <div className="space-y-2 p-4 bg-purple-50/50 rounded-xl border border-purple-100/80">
+                    <div className="flex items-center justify-between">
+                      <label className="font-extrabold text-purple-900 block uppercase tracking-wide text-xs flex items-center gap-1.5">
+                        <Layers className="h-4 w-4 text-purple-600" />
+                        <span>Thành Phần Nhỏ / Chi Tiết ({configPartTab === 'detho' ? 'ĐẾ THÔ' : configPartTab === 'deson' ? 'ĐẾ PHUN SƠN' : 'MẶT GIÀY'})</span>
+                      </label>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const defaults = DEFAULT_SUB_PARTS[configPartTab] || [];
+                          setAppSubPartsStr(defaults.join(', '));
+                        }}
+                        className="text-[11px] font-bold text-purple-700 hover:text-purple-900 flex items-center gap-1 hover:underline cursor-pointer"
+                        title="Nạp lại danh sách thành phần nhỏ mặc định đề xuất"
+                      >
+                        <Sparkles className="h-3.5 w-3.5 text-purple-600" />
+                        <span>Nạp mẫu chuẩn</span>
+                      </button>
+                    </div>
 
+                    <p className="text-[11px] text-purple-700/80 leading-relaxed">
+                      Phân chia các bộ phận, chi tiết nhỏ trực thuộc bộ vị này. Người dùng khi chọn bộ vị có thể chọn nhanh hoặc tự nhập thêm. Phân cách nhau bởi dấu phẩy (,).
+                    </p>
+
+                    <textarea
+                      rows={3}
+                      value={appSubPartsStr}
+                      onChange={(e) => setAppSubPartsStr(e.target.value)}
+                      className="w-full p-3 border border-purple-200 rounded-lg focus:ring-2 focus:ring-purple-500 outline-none transition-all font-semibold text-slate-800 bg-white"
+                      placeholder={configPartTab === 'detho' ? 'VD: Mặt đế, Gót đế, Mũi đế, Viền đế, Đế giữa, Đế ngoài...' : configPartTab === 'deson' ? 'VD: Sơn viền, Sơn mặt đáy, Sơn logo, Sơn gót...' : 'VD: Mũi giày, Thân giày, Lưỡi gà, Cổ giày, Gót giày...'}
+                    />
+
+                    {/* Live tags preview */}
+                    <div className="flex flex-wrap items-center gap-1.5 pt-1">
+                      <span className="text-[10px] text-slate-400 font-bold uppercase shrink-0">Các chi tiết ({appSubPartsStr.split(',').filter(s => s.trim().length > 0).length}):</span>
+                      {appSubPartsStr.split(',').map(s => s.trim()).filter(Boolean).map((tag, idx) => (
+                        <span key={idx} className="text-[11px] font-bold bg-white text-purple-700 border border-purple-200 px-2 py-0.5 rounded-md shadow-2xs">
+                          {tag}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
 
                   <div className="pt-2 flex flex-col sm:flex-row justify-end gap-3">
                     <button
@@ -1587,7 +1644,8 @@ export const AdminPanel = React.memo(function AdminPanel({ onMappingChange }: Ad
                         setAppFloorsStr('');
                         setAppSuppliersStr('');
                         setAppErrorsStr('');
-                                              }}
+                        setAppSubPartsStr('');
+                      }}
                       className="bg-slate-200 hover:bg-slate-300 text-slate-700 px-6 py-3 rounded-lg font-bold flex items-center justify-center gap-2 transition-all cursor-pointer w-full sm:w-auto"
                     >
                       <Trash2 className="h-4.5 w-4.5" />

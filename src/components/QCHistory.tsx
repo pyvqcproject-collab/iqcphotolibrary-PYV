@@ -56,6 +56,7 @@ interface QCReport {
   isDownloaded?: boolean;
   downloadedBy?: string[];
   part?: string;
+  subPart?: string;
   note?: string;
   createdAt: any; // String ISO representation or Firebase timestamp
   isLocalOnly?: boolean;
@@ -261,6 +262,7 @@ export const QCHistory = React.memo(function QCHistory({ user, token, userProfil
   const [editSupplier, setEditSupplier] = useState('');
   const [editNote, setEditNote] = useState('');
   const [editPart, setEditPart] = useState('');
+  const [editSubPart, setEditSubPart] = useState('');
   const [isSavingEdit, setIsSavingEdit] = useState(false);
   
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
@@ -287,6 +289,7 @@ export const QCHistory = React.memo(function QCHistory({ user, token, userProfil
     setEditSupplier(selectedReport.supplier);
     setEditNote(selectedReport.note || '');
     setEditPart(selectedReport.part || '');
+    setEditSubPart(selectedReport.subPart || '');
     setAdminActionError('');
     setIsEditing(true);
   };
@@ -315,7 +318,10 @@ export const QCHistory = React.memo(function QCHistory({ user, token, userProfil
                 order: editOrder,
                 colorCode: editColorCode,
                 errorName: editErrorName,
-                supplier: editSupplier
+                supplier: editSupplier,
+                part: editPart,
+                subPart: editSubPart,
+                note: editNote
               };
             }
             return item;
@@ -330,7 +336,10 @@ export const QCHistory = React.memo(function QCHistory({ user, token, userProfil
           order: editOrder,
           colorCode: editColorCode,
           errorName: editErrorName,
-          supplier: editSupplier
+          supplier: editSupplier,
+          part: editPart,
+          subPart: editSubPart,
+          note: editNote
         };
 
         setSelectedReport(updatedReport);
@@ -344,7 +353,10 @@ export const QCHistory = React.memo(function QCHistory({ user, token, userProfil
           order: editOrder,
           colorCode: editColorCode,
           errorName: editErrorName,
-          supplier: editSupplier
+          supplier: editSupplier,
+          part: editPart,
+          subPart: editSubPart,
+          note: editNote
         });
 
         const updatedReport: QCReport = {
@@ -354,7 +366,10 @@ export const QCHistory = React.memo(function QCHistory({ user, token, userProfil
           order: editOrder,
           colorCode: editColorCode,
           errorName: editErrorName,
-          supplier: editSupplier
+          supplier: editSupplier,
+          part: editPart,
+          subPart: editSubPart,
+          note: editNote
         };
 
         setSelectedReport(updatedReport);
@@ -443,6 +458,7 @@ export const QCHistory = React.memo(function QCHistory({ user, token, userProfil
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedFloor, setSelectedFloor] = useState('all');
   const [selectedSupplier, setSelectedSupplier] = useState('all');
+  const [selectedPart, setSelectedPart] = useState('all');
   const [selectedDownloaded, setSelectedDownloaded] = useState('all');
   const [selectedStatus, setSelectedStatus] = useState('all');
   const [selectedDate, setSelectedDate] = useState('');
@@ -510,6 +526,7 @@ export const QCHistory = React.memo(function QCHistory({ user, token, userProfil
         { header: 'Khu vực', key: 'floor', width: 15 },
         { header: 'Xưởng', key: 'supplier', width: 15 },
         { header: 'Bộ vị', key: 'part', width: 15 },
+        { header: 'Thành phần nhỏ', key: 'subPart', width: 18 },
         { header: 'Ngày lỗi', key: 'date', width: 15 },
         { header: 'Mã NV', key: 'reporter', width: 15 },
         { header: 'Tên nhân viên', key: 'reporterName', width: 20 },
@@ -533,6 +550,7 @@ export const QCHistory = React.memo(function QCHistory({ user, token, userProfil
           floor: report.floor,
           supplier: report.supplier,
           part: report.part || '',
+          subPart: report.subPart || '',
           date: format(parseISO(report.date), 'dd/MM/yyyy'),
           reporter: report.employeeId,
           reporterName: report.employeeName || '',
@@ -544,7 +562,7 @@ export const QCHistory = React.memo(function QCHistory({ user, token, userProfil
           worksheet.getRow(rowIndex).height = 100; // row height 100
           
           for (let imgIndex = 0; imgIndex < report.imageUrls.length; imgIndex++) {
-            const colIndex = imgIndex + 10; // Col K (10, 0-indexed). Columns are: 0:po, 1:color, 2:error, 3:floor, 4:supplier, 5:part, 6:date, 7:reporter, 8:reporterName, 9:note. Images start at 10.
+            const colIndex = imgIndex + 11; // Col L (11, 0-indexed). Columns are: 0:po, 1:color, 2:error, 3:floor, 4:supplier, 5:part, 6:subPart, 7:date, 8:reporter, 9:reporterName, 10:note. Images start at 11.
             
             // Ensure header exists for extra images
             if (imgIndex > 0) {
@@ -602,12 +620,14 @@ export const QCHistory = React.memo(function QCHistory({ user, token, userProfil
       for (const report of filteredReports) {
         if (!report.imageUrls || report.imageUrls.length === 0) continue;
         const safePart = sanitizeName(report.part || 'Khong_Bo_Vi');
+        const safeSubPart = report.subPart ? sanitizeName(report.subPart) : '';
         const safeOrder = sanitizeName(report.order);
         const safeColor = sanitizeName(report.colorCode);
         const safeError = sanitizeName(report.errorName);
         const safeSupplier = sanitizeName(report.supplier);
         const safeFloor = sanitizeName(report.floor);
-        const namePrefix = `${safePart}_${safeOrder}_${safeColor}_${safeError}_${safeSupplier}_${safeFloor}`;
+        const partPrefix = safeSubPart ? `${safePart}_${safeSubPart}` : safePart;
+        const namePrefix = `${partPrefix}_${safeOrder}_${safeColor}_${safeError}_${safeSupplier}_${safeFloor}`;
         
         for (let i = 0; i < report.imageUrls.length; i++) {
            const url = report.imageUrls[i];
@@ -667,12 +687,14 @@ export const QCHistory = React.memo(function QCHistory({ user, token, userProfil
     }
 
     const safePart = sanitizeName(selectedReport.part || 'Khong_Bo_Vi');
+    const safeSubPart = selectedReport.subPart ? sanitizeName(selectedReport.subPart) : '';
     const safeOrder = sanitizeName(selectedReport.order);
     const safeColor = sanitizeName(selectedReport.colorCode);
     const safeError = sanitizeName(selectedReport.errorName);
     const safeSupplier = sanitizeName(selectedReport.supplier);
     const safeFloor = sanitizeName(selectedReport.floor);
-    const namePrefix = `${safePart}_${safeOrder}_${safeColor}_${safeError}_${safeSupplier}_${safeFloor}`;
+    const partPrefix = safeSubPart ? `${safePart}_${safeSubPart}` : safePart;
+    const namePrefix = `${partPrefix}_${safeOrder}_${safeColor}_${safeError}_${safeSupplier}_${safeFloor}`;
     
     // We already have 'getBase64ImageFromUrl' which handles the CORS/object URL properly
     const actualDownloadUrl = loadedImageUrls[activeDetailImageIndex] || objectUrl;
@@ -692,12 +714,15 @@ export const QCHistory = React.memo(function QCHistory({ user, token, userProfil
             setReports(prev => prev.map(r => r.id === selectedReport.id ? { ...r, downloadedBy: [...(r.downloadedBy || []), user.email || ''] } : r));
          } catch(e) { console.error("Failed to mark as downloaded:", e); }
       }
+      const safePart = sanitizeName(selectedReport.part || 'Khong_Bo_Vi');
+      const safeSubPart = selectedReport.subPart ? sanitizeName(selectedReport.subPart) : '';
       const safeOrder = sanitizeName(selectedReport.order);
       const safeColor = sanitizeName(selectedReport.colorCode);
       const safeError = sanitizeName(selectedReport.errorName);
       const safeSupplier = sanitizeName(selectedReport.supplier);
       const safeFloor = sanitizeName(selectedReport.floor);
-      const namePrefix = `${safeOrder}_${safeColor}_${safeError}_${safeSupplier}_${safeFloor}`;
+      const partPrefix = safeSubPart ? `${safePart}_${safeSubPart}` : safePart;
+      const namePrefix = `${partPrefix}_${safeOrder}_${safeColor}_${safeError}_${safeSupplier}_${safeFloor}`;
 
       await downloadImageUrls(selectedReport.imageUrls, namePrefix);
     } catch (e: any) {
@@ -972,6 +997,7 @@ export const QCHistory = React.memo(function QCHistory({ user, token, userProfil
         errorName: report.errorName || '',
         supplier: report.supplier || '',
         part: report.part || '',
+        subPart: report.subPart || '',
         imageUrls: finalImageUrls,
         employeeId: report.employeeId || '',
         employeeEmail: user.email || report.employeeEmail || '',
@@ -1052,11 +1078,16 @@ export const QCHistory = React.memo(function QCHistory({ user, token, userProfil
     return Array.from(new Set(suppliers));
   }, [reports]);
 
+  const uniqueParts = useMemo(() => {
+    const parts = reports.map(r => (r.part || '').trim()).filter(Boolean);
+    return Array.from(new Set(parts));
+  }, [reports]);
+
   // Apply Search and Filters to raw reports list
   const filteredReports = useMemo(() => {
     let result = [...reports];
 
-    // Query Text Filter (Order PO, Color, Error Name, Supplier, Floor)
+    // Query Text Filter (Order PO, Color, Error Name, Supplier, Floor, Part, SubPart)
     if (searchQuery.trim()) {
       const q = searchQuery.toLowerCase();
       result = result.filter(r => 
@@ -1064,8 +1095,15 @@ export const QCHistory = React.memo(function QCHistory({ user, token, userProfil
         r.colorCode.toLowerCase().includes(q) ||
         r.errorName.toLowerCase().includes(q) ||
         r.supplier.toLowerCase().includes(q) ||
-        r.floor.toLowerCase().includes(q)
+        r.floor.toLowerCase().includes(q) ||
+        (r.part && r.part.toLowerCase().includes(q)) ||
+        (r.subPart && r.subPart.toLowerCase().includes(q))
       );
+    }
+
+    // Part Filter
+    if (selectedPart !== 'all') {
+      result = result.filter(r => (r.part || '').trim() === selectedPart);
     }
 
     // Floor Filter
@@ -1177,6 +1215,19 @@ export const QCHistory = React.memo(function QCHistory({ user, token, userProfil
                   <option key={sup} value={sup}>{sup}</option>
                 ))}
               </select>
+
+              {uniqueParts.length > 0 && (
+                <select
+                  value={selectedPart}
+                  onChange={e => setSelectedPart(e.target.value)}
+                  className="h-[30px] px-2 border border-slate-100 rounded-md text-[11px] bg-[#F8FAFC] outline-none focus:ring-1 focus:ring-blue-500 font-medium text-slate-700 flex-1 min-w-[110px]"
+                >
+                  <option value="all">Tất cả bộ vị</option>
+                  {uniqueParts.map(p => (
+                    <option key={p} value={p}>{p}</option>
+                  ))}
+                </select>
+              )}
 
               <select
                 value={selectedStatus}
@@ -1346,6 +1397,11 @@ export const QCHistory = React.memo(function QCHistory({ user, token, userProfil
                         <span className="text-xs font-bold text-purple-700 bg-purple-50 px-2 py-0.5 rounded border border-purple-100 truncate max-w-[120px]">
                           {report.part || 'Khong_Bo_Vi'}
                         </span>
+                        {report.subPart && (
+                          <span className="text-xs font-bold text-indigo-700 bg-indigo-50 px-2 py-0.5 rounded border border-indigo-100 truncate max-w-[140px]">
+                            {report.subPart}
+                          </span>
+                        )}
                         {isAdmin && report.downloadedBy && report.downloadedBy.includes(user.email || '') && (
                           <span className="text-[10px] font-bold text-slate-600 bg-slate-200 px-1.5 py-0.5 rounded-full border border-slate-300 flex items-center gap-1">
                              <CheckCircle className="h-3 w-3" /> Đã tải
@@ -1582,6 +1638,19 @@ export const QCHistory = React.memo(function QCHistory({ user, token, userProfil
                     </div>
 
                     <div className="flex flex-col gap-1.5">
+                      <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider flex items-center gap-1">
+                        <Layers className="h-3 w-3 text-slate-400" /> Thành Phần Nhỏ / Chi Tiết
+                      </label>
+                      <input 
+                        type="text"
+                        value={editSubPart}
+                        onChange={e => setEditSubPart(e.target.value)}
+                        className="w-full p-2 bg-[#F8FAFC] border-transparent border rounded-xl hover:bg-slate-100 focus:bg-white focus:ring-4 focus:ring-blue-500/15 focus:border-blue-500 text-sm outline-none transition-all text-slate-800 font-bold"
+                        placeholder="Nhập thành phần nhỏ (Ví dụ: Gót đế, Sơn viền, Lưỡi gà...)..."
+                      />
+                    </div>
+
+                    <div className="flex flex-col gap-1.5">
                       <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider flex items-center gap-1 font-mono">
                         <Tag className="h-3 w-3 text-slate-400" /> Đơn Hàng (PO)
                       </label>
@@ -1683,8 +1752,11 @@ export const QCHistory = React.memo(function QCHistory({ user, token, userProfil
                       </div>
                       
                       <div className="flex divide-x divide-slate-100 col-span-2">
-                        <div className="p-3 flex-1 flex items-center justify-center text-center">
+                        <div className="p-3 flex-1 flex flex-col items-center justify-center text-center">
                           <span className="text-sm font-bold text-slate-700">{selectedReport.part || 'Không xác định'}</span>
+                          {selectedReport.subPart && (
+                            <span className="text-xs font-semibold text-indigo-600 mt-0.5">({selectedReport.subPart})</span>
+                          )}
                         </div>
                         <div className="p-3 flex-1 flex items-center justify-center text-center">
                           <span className="text-sm font-bold text-slate-800 font-mono tracking-wide">{selectedReport.order}</span>

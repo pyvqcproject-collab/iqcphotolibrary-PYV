@@ -28,7 +28,7 @@ import {
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { QCHistory } from './components/QCHistory';
-import { AdminPanel, QCUser, POMapping, sanitizeMap } from './components/AdminPanel';
+import { AdminPanel, QCUser, POMapping, sanitizeMap, DEFAULT_SUB_PARTS } from './components/AdminPanel';
 
 interface ImagePreviewProps {
   file: File;
@@ -118,6 +118,11 @@ export function QCForm({ user, token, onLogout }: QCFormProps) {
   const [colorOption, setColorOption] = useState('');
   const [customColorInput, setCustomColorInput] = useState('');
 
+  // Sub-component (Thành phần nhỏ) states
+  const [subPart, setSubPart] = useState('');
+  const [subPartOption, setSubPartOption] = useState('');
+  const [subPartOptions, setSubPartOptions] = useState<string[]>([]);
+
   const [isSearchingColor, setIsSearchingColor] = useState(false);
 
   const [success, setSuccess] = useState(false);
@@ -173,11 +178,15 @@ export function QCForm({ user, token, onLogout }: QCFormProps) {
 
   const updatePartConfig = (partKey: string, fullConfigFromStorage: any) => {
     let targetPartConfig = fullConfigFromStorage; // fallback
+    let configKey = 'detho';
     if (partKey === 'MẶT GIÀY') {
+      configKey = 'matgiay';
       targetPartConfig = fullConfigFromStorage['matgiay'] || fullConfigFromStorage;
     } else if (partKey === 'ĐẾ THÔ') {
+      configKey = 'detho';
       targetPartConfig = fullConfigFromStorage['detho'] || fullConfigFromStorage['de'] || fullConfigFromStorage;
     } else if (partKey === 'ĐẾ PHUN SƠN') {
+      configKey = 'deson';
       targetPartConfig = fullConfigFromStorage['deson'] || fullConfigFromStorage['de'] || fullConfigFromStorage;
     }
 
@@ -194,6 +203,10 @@ export function QCForm({ user, token, onLogout }: QCFormProps) {
     if (targetPartConfig.colors && Array.isArray(targetPartConfig.colors)) {
       setColorConfigList(parseColorsConfig(targetPartConfig.colors));
     }
+    const loadedSubParts = (targetPartConfig.subParts && Array.isArray(targetPartConfig.subParts) && targetPartConfig.subParts.length > 0)
+      ? targetPartConfig.subParts
+      : (DEFAULT_SUB_PARTS[configKey] || []);
+    setSubPartOptions(loadedSubParts);
   };
 
   const handlePartChange = (newPart: string) => {
@@ -202,6 +215,8 @@ export function QCForm({ user, token, onLogout }: QCFormProps) {
     // Update local profile state
     const updatedProfile = { ...userProfile, part: newPart as QCUser['part'] };
     setUserProfile(updatedProfile);
+    setSubPart('');
+    setSubPartOption('');
     
     // Load matching config from localeStorage
     const localAppConfigStr = localStorage.getItem('local_app_config');
@@ -262,6 +277,10 @@ export function QCForm({ user, token, onLogout }: QCFormProps) {
           if (parsed.errors && parsed.errors.length) setErrorOptions(parsed.errors);
           if (parsed.suppliers && parsed.suppliers.length) setSupplierOptions(parsed.suppliers);
           if (parsed.colors && parsed.colors.length) setColorConfigList(parseColorsConfig(parsed.colors));
+          const cachedSubParts = (parsed.subParts && Array.isArray(parsed.subParts) && parsed.subParts.length > 0)
+            ? parsed.subParts
+            : (DEFAULT_SUB_PARTS[activePartKey] || []);
+          setSubPartOptions(cachedSubParts);
        }
     } catch (e) {
        console.warn("Failed to load local cache", e);
@@ -373,11 +392,15 @@ export function QCForm({ user, token, onLogout }: QCFormProps) {
         let targetPartConfig = fullConfig; // original flat config fallback
         
         let userPartContext = matched?.part || '';
+        let configKey = 'detho';
         if (userPartContext === 'MẶT GIÀY') {
+           configKey = 'matgiay';
            targetPartConfig = fullConfig['matgiay'] || fullConfig;
         } else if (userPartContext === 'ĐẾ THÔ') {
+           configKey = 'detho';
            targetPartConfig = fullConfig['detho'] || fullConfig['de'] || fullConfig;
         } else if (userPartContext === 'ĐẾ PHUN SƠN') {
+           configKey = 'deson';
            targetPartConfig = fullConfig['deson'] || fullConfig['de'] || fullConfig;
         }
 
@@ -385,6 +408,10 @@ export function QCForm({ user, token, onLogout }: QCFormProps) {
         if (targetPartConfig.errors && Array.isArray(targetPartConfig.errors)) setErrorOptions(targetPartConfig.errors);
         if (targetPartConfig.suppliers && Array.isArray(targetPartConfig.suppliers)) setSupplierOptions(targetPartConfig.suppliers);
         if (targetPartConfig.colors && Array.isArray(targetPartConfig.colors)) setColorConfigList(parseColorsConfig(targetPartConfig.colors));
+        const subPartsToUse = (targetPartConfig.subParts && Array.isArray(targetPartConfig.subParts) && targetPartConfig.subParts.length > 0)
+          ? targetPartConfig.subParts
+          : (DEFAULT_SUB_PARTS[configKey] || []);
+        setSubPartOptions(subPartsToUse);
         
         localStorage.setItem('local_app_config', JSON.stringify(fullConfig));
       }
@@ -644,6 +671,7 @@ export function QCForm({ user, token, onLogout }: QCFormProps) {
       errorName,
       supplier,
       part: userProfile?.part || '',
+      subPart: subPart.trim(),
       employeeId: userProfile?.employeeId || user.email?.split('@')[0] || 'Unknown',
       employeeName: userProfile?.name || '',
       employeeEmail: user.email || '',
@@ -664,6 +692,8 @@ export function QCForm({ user, token, onLogout }: QCFormProps) {
     setColorCode('');
     setErrorOption('');
     setCustomErrorInput('');
+    setSubPart('');
+    setSubPartOption('');
     setNote('');
     setFiles([]);
     if (fileInputRef.current) fileInputRef.current.value = '';
@@ -677,11 +707,13 @@ export function QCForm({ user, token, onLogout }: QCFormProps) {
       const totalFiles = reportFiles.length;
       const timestamp = Date.now();
       const safePart = sanitizeName(reportPayloadBase.part || 'Khong_Bo_Vi');
+      const safeSubPart = reportPayloadBase.subPart ? sanitizeName(reportPayloadBase.subPart) : '';
       const safeOrder = sanitizeName(reportPayloadBase.order);
       const safeColor = sanitizeName(reportPayloadBase.colorCode);
       const safeError = sanitizeName(reportPayloadBase.errorName);
       const safeSupplier = sanitizeName(reportPayloadBase.supplier);
       const safeFloor = sanitizeName(reportPayloadBase.floor);
+      const partPrefix = safeSubPart ? `${safePart}_${safeSubPart}` : safePart;
 
       let completedUploads = 0;
 
@@ -713,7 +745,7 @@ export function QCForm({ user, token, onLogout }: QCFormProps) {
           compressedBlob = file;
         }
         
-        const fileName = `${safeOrder}_${safeColor}_${safeError}_${safeSupplier}_${safeFloor}_${i + 1}_${timestamp}.jpg`;
+        const fileName = `${partPrefix}_${safeOrder}_${safeColor}_${safeError}_${safeSupplier}_${safeFloor}_${i + 1}_${timestamp}.jpg`;
         let downloadUrl = '';
         
         if (!navigator.onLine) {
@@ -974,6 +1006,62 @@ export function QCForm({ user, token, onLogout }: QCFormProps) {
                     </div>
                   )}
                 </div>
+              </div>
+
+              {/* Thành phần nhỏ / Chi tiết bộ vị */}
+              <div className="flex flex-col gap-1.5 text-xs">
+                <label htmlFor="subPart" className="sr-only">Thành phần nhỏ</label>
+                <div className="relative">
+                  <select
+                    id="subPart"
+                    value={subPartOption}
+                    onChange={e => {
+                      const val = e.target.value;
+                      setSubPartOption(val);
+                      if (val !== 'CUSTOM' && val !== '') {
+                        setSubPart(val);
+                      } else if (val === 'CUSTOM') {
+                        setSubPart('');
+                      } else {
+                        setSubPart('');
+                      }
+                    }}
+                    className="w-full px-3.5 py-3 sm:py-3.5 bg-slate-100/80 border-transparent border rounded-xl hover:bg-slate-100 focus:bg-white focus:ring-4 focus:ring-blue-500/15 focus:border-blue-500 outline-none transition-all font-bold text-slate-800 text-sm"
+                  >
+                    <option value="">Thành phần nhỏ ({userProfile?.part ? `${userProfile.part} - Tùy chọn` : 'Tùy chọn'}...)</option>
+                    {subPartOptions.map(sp => (
+                      <option key={sp} value={sp}>{sp}</option>
+                    ))}
+                    <option value="CUSTOM">➕ Tự nhập thành phần khác...</option>
+                  </select>
+                </div>
+
+                {subPartOption === 'CUSTOM' && (
+                  <input
+                    type="text"
+                    placeholder="Nhập tên thành phần nhỏ cụ thể (VD: Gót đế, Sơn viền, Lưỡi gà...)..."
+                    value={subPart}
+                    onChange={e => setSubPart(e.target.value)}
+                    className="px-3.5 py-2.5 bg-orange-50 border-orange-200 border-2 rounded-xl focus:bg-white focus:ring-4 focus:ring-orange-500/15 focus:border-orange-500 outline-none transition-all font-bold text-slate-800 text-sm"
+                  />
+                )}
+
+                {/* Quick select chips for rapid 1-tap choice */}
+                {subPartOptions.length > 0 && !subPartOption && (
+                  <div className="flex items-center gap-1.5 overflow-x-auto py-0.5 scrollbar-none">
+                    <span className="text-[10px] text-slate-400 font-bold uppercase shrink-0">Gợi ý:</span>
+                    {subPartOptions.slice(0, 6).map(sp => (
+                      <button
+                        key={sp}
+                        type="button"
+                        onClick={() => { setSubPartOption(sp); setSubPart(sp); }}
+                        className="text-[11px] font-bold bg-slate-100 hover:bg-blue-50 hover:text-blue-700 hover:border-blue-200 text-slate-600 px-2.5 py-1 rounded-lg border border-slate-200/60 whitespace-nowrap transition-colors cursor-pointer shrink-0"
+                      >
+                        {sp}
+                      </button>
+                    ))}
+                  </div>
+                )}
               </div>
 
               {/* Floor and Order Block */}

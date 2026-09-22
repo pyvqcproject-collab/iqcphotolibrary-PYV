@@ -11,6 +11,8 @@
         "colorCode": { "type": "string", "description": "Color code" },
         "errorName": { "type": "string", "description": "Name of the error" },
         "supplier": { "type": "string", "description": "Supplier name" },
+        "part": { "type": "string", "description": "Main component/part name (e.g. ĐẾ THÔ, ĐẾ PHUN SƠN, MẶT GIÀY)" },
+        "subPart": { "type": "string", "description": "Sub-component/sub-part detail name" },
         "imageUrls": { "type": "array", "description": "List of compressed image URLs" },
         "employeeId": { "type": "string", "description": "Employee ID who created this report" },
         "employeeEmail": { "type": "string", "description": "Employee Email" },

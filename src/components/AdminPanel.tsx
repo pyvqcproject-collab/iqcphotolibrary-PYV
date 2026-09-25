@@ -31,8 +31,61 @@ import {
   Hash,
   RefreshCw,
   Layers,
-  Sparkles
+  Sparkles,
+  Box,
+  ClipboardList,
+  Filter,
+  Check
 } from 'lucide-react';
+
+export interface SupplierModelMapping {
+  supplier: string;
+  model: string;
+}
+
+export const DEFAULT_SUPPLIER_MODELS: Record<string, SupplierModelMapping[]> = {
+  detho: [
+    { supplier: 'JIA HOA', model: 'FCXV5' },
+    { supplier: 'JIA HOA', model: 'FCXV6' },
+    { supplier: 'JIA HOA', model: 'PEG40' },
+    { supplier: 'VĨNH TÀI', model: 'FCXV7' },
+    { supplier: 'VĨNH TÀI', model: 'FCXV8' },
+    { supplier: 'NỘI BỘ', model: 'AF1-SOLE' },
+  ],
+  deson: [
+    { supplier: 'JIA HOA', model: 'FCXV5' },
+    { supplier: 'JIA HOA', model: 'FCXV6' },
+    { supplier: 'VĨNH TÀI', model: 'FCXV7' },
+    { supplier: 'VĨNH TÀI', model: 'FCXV8' },
+  ],
+  matgiay: [
+    { supplier: 'JIA HOA', model: 'FCXV5' },
+    { supplier: 'JIA HOA', model: 'FCXV6' },
+    { supplier: 'VĨNH TÀI', model: 'FCXV7' },
+    { supplier: 'NỘI BỘ', model: 'DUNK-HIGH' },
+  ]
+};
+
+export const DEFAULT_COLORS_LIST: Record<string, string[]> = {
+  detho: [],
+  deson: [],
+  matgiay: [
+    'MFCXVLI5',
+    'MFCXV2ZU',
+    '100-WHITE',
+    '001-BLACK',
+    '400-ROYAL',
+    'RED-CRIMSON',
+    '101-SAIL',
+    '010-WOLF-GREY',
+    '200-BEIGE',
+    '002-COOL-GREY',
+    '300-PINE-GREEN',
+    '600-VARSITY-RED',
+    'NAVY-01',
+    'CHARCOAL-BLACK'
+  ]
+};
 
 export const DEFAULT_SUB_PARTS: Record<string, string[]> = {
   detho: ['Mặt đế', 'Gót đế', 'Mũi đế', 'Viền đế', 'Đế giữa', 'Đế ngoài', 'Hoa văn đế', 'Chân đế'],
@@ -129,6 +182,18 @@ export const AdminPanel = React.memo(function AdminPanel({ onMappingChange }: Ad
   const [appErrorsStr, setAppErrorsStr] = useState('');
   const [appSuppliersStr, setAppSuppliersStr] = useState('');
   const [appSubPartsStr, setAppSubPartsStr] = useState('');
+  
+  // Supplier Models & Colors States
+  const [appSupplierModels, setAppSupplierModels] = useState<SupplierModelMapping[]>([]);
+  const [bulkModelPasteText, setBulkModelPasteText] = useState('');
+  const [newModelSupplier, setNewModelSupplier] = useState('');
+  const [newModelName, setNewModelName] = useState('');
+  const [modelSearchFilter, setModelSearchFilter] = useState('');
+  
+  const [appColorsList, setAppColorsList] = useState<string[]>([]);
+  const [bulkColorPasteText, setBulkColorPasteText] = useState('');
+  const [newColorName, setNewColorName] = useState('');
+  
   const [isSavingAppConfig, setIsSavingAppConfig] = useState(false);
   const [loadingAppConfig, setLoadingAppConfig] = useState(true);
 
@@ -396,6 +461,11 @@ export const AdminPanel = React.memo(function AdminPanel({ onMappingChange }: Ad
       setAppSuppliersStr((currentData.suppliers || []).join(', '));
       const currentSubParts = currentData.subParts || DEFAULT_SUB_PARTS[configPartTab] || DEFAULT_SUB_PARTS['detho'] || [];
       setAppSubPartsStr(currentSubParts.join(', '));
+      
+      const currentSupplierModels = currentData.supplierModels || DEFAULT_SUPPLIER_MODELS[configPartTab] || DEFAULT_SUPPLIER_MODELS['detho'] || [];
+      setAppSupplierModels(currentSupplierModels);
+      const currentColors = currentData.colors || DEFAULT_COLORS_LIST[configPartTab] || DEFAULT_COLORS_LIST['detho'] || [];
+      setAppColorsList(currentColors);
             
       if (Object.keys(configData).length > 0) {
         localStorage.setItem('local_app_config', JSON.stringify(configData));
@@ -434,26 +504,147 @@ export const AdminPanel = React.memo(function AdminPanel({ onMappingChange }: Ad
   }, []);
 
   const handleConfigTabChange = (newTab: 'detho' | 'deson' | 'matgiay') => {
-    // Save current strings to memory
+    // Save current strings and arrays to memory
     const updatedConfig = {
       ...fullAppConfig,
       [configPartTab]: {
         floors: appFloorsStr.split(',').map(s => s.trim().toUpperCase()).filter(s => s.length > 0),
         errors: appErrorsStr.split(',').map(s => s.trim()).filter(s => s.length > 0),
         suppliers: appSuppliersStr.split(',').map(s => s.trim()).filter(s => s.length > 0),
-        subParts: appSubPartsStr.split(',').map(s => s.trim()).filter(s => s.length > 0)
+        subParts: appSubPartsStr.split(',').map(s => s.trim()).filter(s => s.length > 0),
+        supplierModels: appSupplierModels,
+        colors: appColorsList
       }
     };
     setFullAppConfig(updatedConfig);
     
-    // Load strings for new tab
+    // Load strings and lists for new tab
     const newData = updatedConfig[newTab] || {};
     setAppFloorsStr((newData.floors || []).join(', '));
     setAppErrorsStr((newData.errors || []).join(', '));
     setAppSuppliersStr((newData.suppliers || []).join(', '));
     setAppSubPartsStr((newData.subParts || DEFAULT_SUB_PARTS[newTab] || []).join(', '));
+    setAppSupplierModels(newData.supplierModels || DEFAULT_SUPPLIER_MODELS[newTab] || []);
+    setAppColorsList(newData.colors || DEFAULT_COLORS_LIST[newTab] || []);
         
     setConfigPartTab(newTab);
+  };
+
+  // Import bulk supplier <-> model 2-column data
+  const handleImportBulkModels = () => {
+    if (!bulkModelPasteText.trim()) {
+      setAdminError("Vui lòng dán danh sách dữ liệu 2 cột (Xưởng và Hình thể) từ Excel.");
+      return;
+    }
+    setAdminError('');
+    setAdminSuccess('');
+
+    const lines = bulkModelPasteText.split('\n');
+    let addedCount = 0;
+    const currentList = [...appSupplierModels];
+    const knownSuppliers = appSuppliersStr.split(',').map(s => s.trim().toUpperCase()).filter(Boolean);
+
+    for (let rawLine of lines) {
+      const line = rawLine.trim();
+      if (!line) continue;
+
+      // Split by tab, semicolon, comma or 2+ spaces
+      const parts = line.split(/[\t,;]|\s{2,}/).map(s => s.trim()).filter(Boolean);
+      let supplier = '';
+      let model = '';
+
+      if (parts.length >= 2) {
+        const p0 = parts[0].toUpperCase();
+        const p1 = parts[1].toUpperCase();
+
+        if (knownSuppliers.includes(p1) && !knownSuppliers.includes(p0)) {
+          supplier = p1;
+          model = p0;
+        } else {
+          supplier = p0;
+          model = p1;
+        }
+      } else if (parts.length === 1) {
+        supplier = newModelSupplier || (knownSuppliers[0] || 'CHUNG');
+        model = parts[0].toUpperCase();
+      }
+
+      if (supplier && model) {
+        const exists = currentList.some(item => item.supplier.toUpperCase() === supplier.toUpperCase() && item.model.toUpperCase() === model.toUpperCase());
+        if (!exists) {
+          currentList.push({ supplier: supplier.toUpperCase(), model: model.toUpperCase() });
+          addedCount++;
+        }
+      }
+    }
+
+    setAppSupplierModels(currentList);
+    setBulkModelPasteText('');
+    setAdminSuccess(`Đã nạp thành công ${addedCount} liên kết [Xưởng cung ứng ⇄ Hình thể] mới! Nhấn "LƯU CẤU HÌNH DANH SÁCH MỚI" để ghi nhận.`);
+  };
+
+  const handleAddSingleModel = () => {
+    if (!newModelName.trim()) {
+      setAdminError("Vui lòng nhập tên hình thể (Ví dụ: FCXV5).");
+      return;
+    }
+    const knownSuppliers = appSuppliersStr.split(',').map(s => s.trim().toUpperCase()).filter(Boolean);
+    const supplier = (newModelSupplier.trim() || knownSuppliers[0] || 'JIA HOA').toUpperCase();
+    const model = newModelName.trim().toUpperCase();
+
+    const exists = appSupplierModels.some(item => item.supplier.toUpperCase() === supplier && item.model.toUpperCase() === model);
+    if (exists) {
+      setAdminError(`Hình thể ${model} đã tồn tại cho xưởng ${supplier}.`);
+      return;
+    }
+
+    setAppSupplierModels(prev => [...prev, { supplier, model }]);
+    setNewModelName('');
+    setAdminSuccess(`Đã thêm hình thể ${model} cho xưởng ${supplier}!`);
+  };
+
+  const handleDeleteModel = (indexToDelete: number) => {
+    setAppSupplierModels(prev => prev.filter((_, idx) => idx !== indexToDelete));
+  };
+
+  // Import bulk colors
+  const handleImportBulkColors = () => {
+    if (!bulkColorPasteText.trim()) {
+      setAdminError("Vui lòng dán danh sách mã màu từ Excel dạng cột.");
+      return;
+    }
+    setAdminError('');
+    setAdminSuccess('');
+
+    const lines = bulkColorPasteText.split(/[\n\t,;]+/);
+    let addedCount = 0;
+    const currentColors = [...appColorsList];
+
+    for (let raw of lines) {
+      const c = raw.trim().toUpperCase();
+      if (c && !currentColors.includes(c)) {
+        currentColors.push(c);
+        addedCount++;
+      }
+    }
+
+    setAppColorsList(currentColors);
+    setBulkColorPasteText('');
+    setAdminSuccess(`Đã nạp thêm ${addedCount} mã màu mới vào danh sách!`);
+  };
+
+  const handleAddSingleColor = () => {
+    if (!newColorName.trim()) return;
+    const c = newColorName.trim().toUpperCase();
+    if (!appColorsList.includes(c)) {
+      setAppColorsList(prev => [...prev, c]);
+      setAdminSuccess(`Đã thêm mã màu ${c}!`);
+    }
+    setNewColorName('');
+  };
+
+  const handleDeleteColor = (indexToDelete: number) => {
+    setAppColorsList(prev => prev.filter((_, idx) => idx !== indexToDelete));
   };
 
   // Save App Config
@@ -475,7 +666,9 @@ export const AdminPanel = React.memo(function AdminPanel({ onMappingChange }: Ad
           floors: parsedFloors,
           errors: parsedErrors,
           suppliers: parsedSuppliers,
-          subParts: parsedSubParts
+          subParts: parsedSubParts,
+          supplierModels: appSupplierModels,
+          colors: appColorsList
         }
       };
       
@@ -1004,40 +1197,40 @@ export const AdminPanel = React.memo(function AdminPanel({ onMappingChange }: Ad
   };
 
   return (
-    <div className="md:h-full flex flex-col bg-[#F8FAFC] md:overflow-hidden">
+    <div className="md:h-full flex flex-col bg-slate-100 md:overflow-hidden">
       {/* Sub Header & Tabs inside AdminPanel */}
       <h1 className="hidden">Admin Panel</h1>
-      <div className="bg-white border-b border-slate-100/80 px-6 py-4 flex flex-col md:flex-row md:items-center md:justify-between shrink-0 gap-3">
+      <div className="bg-slate-900 border-b border-slate-800 px-4 sm:px-6 py-3 flex flex-col md:flex-row md:items-center md:justify-between shrink-0 gap-3">
         <div className="flex items-center gap-2">
-          <ShieldCheck className="h-5 w-5 text-blue-600" />
-          <h2 className="text-base font-extrabold text-slate-800 tracking-tight uppercase">Trung tâm quản trị dữ liệu QC (ADMIN)</h2>
+          <ShieldCheck className="h-5 w-5 text-blue-400" />
+          <h2 className="text-sm font-bold text-white tracking-wide uppercase font-mono">Quản Trị Hệ Thống Dữ Liệu QC (Admin Control)</h2>
         </div>
         
         {/* Sub tabs switcher */}
-        <div className="flex bg-slate-100 p-1 rounded-lg border border-slate-100/80 text-xs text-nowrap overflow-x-auto">
+        <div className="flex bg-slate-800 p-1 rounded border border-slate-700 text-xs font-mono overflow-x-auto">
           <button
             type="button"
             onClick={() => { setSubTab('users'); setAdminError(''); setAdminSuccess(''); }}
-            className={`px-4 py-2 font-extrabold rounded-md flex items-center gap-1.5 transition-all cursor-pointer ${subTab === 'users' ? 'bg-white text-slate-800 shadow-sm' : 'text-slate-500 hover:text-slate-800'}`}
+            className={`px-3 py-1.5 font-bold rounded flex items-center gap-1.5 transition-all cursor-pointer ${subTab === 'users' ? 'bg-blue-600 text-white shadow-xs' : 'text-slate-300 hover:text-white hover:bg-slate-700'}`}
           >
-            <Users className="h-4 w-4 text-blue-500" />
-            QUẢN LÝ NHÂN SỰ
+            <Users className="h-3.5 w-3.5" />
+            NHÂN SỰ & QUYỀN
           </button>
           <button
             type="button"
             onClick={() => { setSubTab('po_colors'); setAdminError(''); setAdminSuccess(''); }}
-            className={`px-4 py-2 font-extrabold rounded-md flex items-center gap-1.5 transition-all cursor-pointer ${subTab === 'po_colors' ? 'bg-white text-slate-800 shadow-sm' : 'text-slate-500 hover:text-slate-800'}`}
+            className={`px-3 py-1.5 font-bold rounded flex items-center gap-1.5 transition-all cursor-pointer ${subTab === 'po_colors' ? 'bg-blue-600 text-white shadow-xs' : 'text-slate-300 hover:text-white hover:bg-slate-700'}`}
           >
-            <FileSpreadsheet className="h-4 w-4 text-emerald-500 shrink-0" />
-            ĐƠN HÀNG PO & MÃ MÀU
+            <FileSpreadsheet className="h-3.5 w-3.5" />
+            PO & MÃ MÀU
           </button>
           <button
             type="button"
             onClick={() => { setSubTab('options'); setAdminError(''); setAdminSuccess(''); }}
-            className={`px-4 py-2 font-extrabold rounded-md flex items-center gap-1.5 transition-all cursor-pointer ${subTab === 'options' ? 'bg-white text-slate-800 shadow-sm' : 'text-slate-500 hover:text-slate-800'}`}
+            className={`px-3 py-1.5 font-bold rounded flex items-center gap-1.5 transition-all cursor-pointer ${subTab === 'options' ? 'bg-blue-600 text-white shadow-xs' : 'text-slate-300 hover:text-white hover:bg-slate-700'}`}
           >
-            <Sliders className="h-4 w-4 text-orange-500 shrink-0" />
-            CẤU HÌNH DANH SÁCH
+            <Sliders className="h-3.5 w-3.5" />
+            CẤU HÌNH DANH MỤC
           </button>
         </div>
 
@@ -1045,9 +1238,9 @@ export const AdminPanel = React.memo(function AdminPanel({ onMappingChange }: Ad
           type="button"
           onClick={handleSyncSettings}
           disabled={isSyncingAll}
-          className="ml-auto px-4 py-2.5 bg-amber-500 hover:bg-amber-600 disabled:bg-slate-300 text-white text-xs font-extrabold rounded-lg flex items-center gap-2 shadow-sm shrink-0 whitespace-nowrap transition-colors"
+          className="ml-auto px-3.5 py-2 bg-amber-600 hover:bg-amber-700 disabled:bg-slate-700 text-white text-xs font-mono font-bold rounded flex items-center gap-2 shadow-xs shrink-0 whitespace-nowrap transition-colors cursor-pointer"
         >
-          <RefreshCw className={`h-4 w-4 ${isSyncingAll ? 'animate-spin' : ''}`} />
+          <RefreshCw className={`h-3.5 w-3.5 ${isSyncingAll ? 'animate-spin' : ''}`} />
           {isSyncingAll ? 'ĐANG ĐỒNG BỘ...' : 'ĐỒNG BỘ LÊN CLOUD'}
         </button>
       </div>
@@ -1055,16 +1248,16 @@ export const AdminPanel = React.memo(function AdminPanel({ onMappingChange }: Ad
       {/* Main Form Fields / Feedback messages */}
       <div className="flex-1 md:overflow-y-auto p-4 md:p-6 pb-[40vh] md:pb-6 space-y-4">
         {adminError && (
-          <div className="bg-red-50 border border-red-200 rounded-lg p-4 flex gap-3 text-red-800 max-w-4xl mx-auto items-start">
-            <AlertCircle className="h-5 w-5 text-red-500 shrink-0 mt-0.5" />
-            <span className="text-xs md:text-sm font-semibold leading-relaxed">{adminError}</span>
+          <div className="bg-red-50 border border-red-200 rounded p-3.5 flex gap-2.5 text-red-900 max-w-4xl mx-auto items-start">
+            <AlertCircle className="h-4.5 w-4.5 text-red-600 shrink-0 mt-0.5" />
+            <span className="text-xs font-semibold leading-relaxed">{adminError}</span>
           </div>
         )}
 
         {adminSuccess && (
-          <div className="bg-emerald-50 border border-emerald-200 rounded-lg p-4 flex gap-3 text-emerald-800 max-w-4xl mx-auto items-start">
-            <CheckCircle className="h-5 w-5 text-emerald-500 shrink-0 mt-0.5" />
-            <span className="text-xs md:text-sm font-semibold leading-relaxed">{adminSuccess}</span>
+          <div className="bg-emerald-50 border border-emerald-200 rounded p-3.5 flex gap-2.5 text-emerald-900 max-w-4xl mx-auto items-start">
+            <CheckCircle className="h-4.5 w-4.5 text-emerald-600 shrink-0 mt-0.5" />
+            <span className="text-xs font-semibold leading-relaxed">{adminSuccess}</span>
           </div>
         )}
 
@@ -1636,6 +1829,247 @@ export const AdminPanel = React.memo(function AdminPanel({ onMappingChange }: Ad
                       ))}
                     </div>
                   </div>
+
+                  {/* CẤU HÌNH XƯỞNG CUNG ỨNG & HÌNH THỂ TƯƠNG ỨNG (DÁN DẠNG CỘT) */}
+                  <div className="space-y-4 p-4.5 bg-blue-50/60 rounded-xl border border-blue-200/80">
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-blue-200/60 pb-2.5">
+                      <div>
+                        <label className="font-extrabold text-blue-900 block uppercase tracking-wide text-xs flex items-center gap-1.5">
+                          <Box className="h-4 w-4 text-blue-600" />
+                          <span>Xưởng Cung Ứng & Hình Thể Chạy Tương Ứng ({configPartTab === 'detho' ? 'ĐẾ THÔ' : configPartTab === 'deson' ? 'ĐẾ PHUN SƠN' : 'MẶT GIÀY'})</span>
+                        </label>
+                        <p className="text-[11px] text-blue-700/85 mt-0.5">
+                          Khi chọn xưởng cung ứng, hệ thống sẽ lọc hình thể tương ứng. Dán 2 cột từ Excel hoặc nhập từng dòng.
+                        </p>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <span className="text-[11px] font-extrabold bg-blue-100 text-blue-800 px-2.5 py-1 rounded-md border border-blue-200">
+                          {appSupplierModels.length} hình thể
+                        </span>
+                        {appSupplierModels.length > 0 && (
+                          <button
+                            type="button"
+                            onClick={() => {
+                              if (window.confirm("Bạn có chắc chắn muốn xóa toàn bộ danh sách hình thể của bộ vị này?")) {
+                                setAppSupplierModels([]);
+                              }
+                            }}
+                            className="text-[11px] font-bold text-red-600 hover:text-red-800 hover:underline cursor-pointer"
+                          >
+                            Xóa hết
+                          </button>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Bulk Copy & Paste Columns */}
+                    <div className="bg-white p-3.5 rounded-lg border border-blue-200 space-y-2">
+                      <div className="flex items-center justify-between">
+                        <span className="text-[11px] font-extrabold text-slate-700 uppercase flex items-center gap-1">
+                          <ClipboardList className="h-3.5 w-3.5 text-blue-600" />
+                          Dán dữ liệu dạng 2 cột từ Excel ([Xưởng] và [Hình thể])
+                        </span>
+                        <span className="text-[10px] text-slate-400 font-semibold">Tự động nhận diện 2 cột</span>
+                      </div>
+                      <textarea
+                        rows={3}
+                        value={bulkModelPasteText}
+                        onChange={(e) => setBulkModelPasteText(e.target.value)}
+                        placeholder={`Dán từ Excel vào đây, ví dụ:\nJIA HOA\tFCXV5\nJIA HOA\tFCXV6\nVĨNH TÀI\tFCXV7`}
+                        className="w-full p-2.5 text-xs font-mono border border-slate-200 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none bg-slate-50 focus:bg-white text-slate-800"
+                      />
+                      <div className="flex justify-end">
+                        <button
+                          type="button"
+                          onClick={handleImportBulkModels}
+                          className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs rounded-lg flex items-center gap-1.5 shadow-xs cursor-pointer transition-colors"
+                        >
+                          <Plus className="h-3.5 w-3.5" />
+                          NẠP DỮ LIỆU CỘT VÀO DANH SÁCH
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* Single Add Row */}
+                    <div className="bg-white p-3 rounded-lg border border-blue-200 flex flex-col sm:flex-row gap-2 items-center">
+                      <div className="w-full sm:w-1/3">
+                        <select
+                          value={newModelSupplier}
+                          onChange={(e) => setNewModelSupplier(e.target.value)}
+                          className="w-full p-2 text-xs border border-slate-200 rounded-md font-bold text-slate-700 bg-slate-50 focus:bg-white focus:ring-1 focus:ring-blue-500 outline-none"
+                        >
+                          <option value="">-- Chọn xưởng --</option>
+                          {appSuppliersStr.split(',').map(s => s.trim()).filter(Boolean).map(sup => (
+                            <option key={sup} value={sup}>{sup}</option>
+                          ))}
+                        </select>
+                      </div>
+                      <div className="w-full sm:w-1/2">
+                        <input
+                          type="text"
+                          value={newModelName}
+                          onChange={(e) => setNewModelName(e.target.value)}
+                          onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); handleAddSingleModel(); } }}
+                          placeholder="Nhập tên hình thể (VD: FCXV5)..."
+                          className="w-full p-2 text-xs border border-slate-200 rounded-md font-bold uppercase text-slate-800 bg-slate-50 focus:bg-white focus:ring-1 focus:ring-blue-500 outline-none"
+                        />
+                      </div>
+                      <button
+                        type="button"
+                        onClick={handleAddSingleModel}
+                        className="w-full sm:w-auto px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs rounded-md shrink-0 flex items-center justify-center gap-1 cursor-pointer transition-colors"
+                      >
+                        <Plus className="h-3.5 w-3.5" />
+                        Thêm
+                      </button>
+                    </div>
+
+                    {/* Filter & Table of Mappings */}
+                    {appSupplierModels.length > 0 && (
+                      <div className="space-y-2">
+                        <div className="flex items-center justify-between">
+                          <div className="relative w-full max-w-xs">
+                            <input
+                              type="text"
+                              value={modelSearchFilter}
+                              onChange={(e) => setModelSearchFilter(e.target.value)}
+                              placeholder="Lọc xưởng hoặc hình thể..."
+                              className="w-full pl-7 pr-3 py-1.5 text-xs border border-blue-200 rounded-md bg-white font-semibold text-slate-700 outline-none"
+                            />
+                            <Filter className="h-3.5 w-3.5 text-slate-400 absolute left-2 top-2" />
+                          </div>
+                          <span className="text-[10px] text-slate-500 font-bold">
+                            Hiển thị {appSupplierModels.filter(m => !modelSearchFilter.trim() || m.supplier.toLowerCase().includes(modelSearchFilter.toLowerCase()) || m.model.toLowerCase().includes(modelSearchFilter.toLowerCase())).length} mục
+                          </span>
+                        </div>
+
+                        <div className="max-h-56 overflow-y-auto border border-blue-200 rounded-lg bg-white divide-y divide-slate-100">
+                          {appSupplierModels
+                            .filter(m => !modelSearchFilter.trim() || m.supplier.toLowerCase().includes(modelSearchFilter.toLowerCase()) || m.model.toLowerCase().includes(modelSearchFilter.toLowerCase()))
+                            .map((item, idx) => (
+                              <div key={idx} className="flex items-center justify-between p-2 px-3 text-xs hover:bg-blue-50/50 transition-colors">
+                                <div className="flex items-center gap-2">
+                                  <span className="font-bold text-slate-700 bg-slate-100 px-2 py-0.5 rounded text-[11px] border border-slate-200">
+                                    {item.supplier}
+                                  </span>
+                                  <span className="text-slate-400">➔</span>
+                                  <span className="font-mono font-extrabold text-blue-700 bg-blue-50 border border-blue-200 px-2 py-0.5 rounded text-[11px]">
+                                    {item.model}
+                                  </span>
+                                </div>
+                                <button
+                                  type="button"
+                                  onClick={() => handleDeleteModel(idx)}
+                                  className="text-slate-400 hover:text-red-600 p-1 rounded hover:bg-red-50 cursor-pointer"
+                                  title="Xóa dòng"
+                                >
+                                  <Trash2 className="h-3.5 w-3.5" />
+                                </button>
+                              </div>
+                            ))}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* CẤU HÌNH DANH SÁCH MÃ MÀU CHO BỘ VỊ NÀY */}
+                  {configPartTab === 'matgiay' ? (
+                    <div className="space-y-4 p-4.5 bg-emerald-50/60 rounded-xl border border-emerald-200/80">
+                      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-emerald-200/60 pb-2.5">
+                        <div>
+                          <label className="font-extrabold text-emerald-900 block uppercase tracking-wide text-xs flex items-center gap-1.5">
+                            <Sparkles className="h-4 w-4 text-emerald-600" />
+                            <span>Danh Sách Mã Màu (MẶT GIÀY)</span>
+                          </label>
+                          <p className="text-[11px] text-emerald-700/85 mt-0.5">
+                            Danh sách mã màu hiển thị khi nhân viên bấm vào "NHẬP MÃ MÀU" cho bộ vị Mặt giày (ví dụ: 100-WHITE, 001-BLACK, 400-ROYAL...). Không bao gồm hình thể. Dán dạng cột từ Excel.
+                          </p>
+                        </div>
+                        <span className="text-[11px] font-extrabold bg-emerald-100 text-emerald-800 px-2.5 py-1 rounded-md border border-emerald-200 shrink-0">
+                          {appColorsList.length} mã màu
+                        </span>
+                      </div>
+
+                      {/* Bulk Paste Colors */}
+                      <div className="bg-white p-3.5 rounded-lg border border-emerald-200 space-y-2">
+                        <div className="flex items-center justify-between">
+                          <span className="text-[11px] font-extrabold text-slate-700 uppercase flex items-center gap-1">
+                            <ClipboardList className="h-3.5 w-3.5 text-emerald-600" />
+                            Dán danh sách mã màu dạng cột từ Excel (Mặt giày)
+                          </span>
+                          <span className="text-[10px] text-slate-400 font-semibold">Tự động nhận diện từng dòng</span>
+                        </div>
+                        <textarea
+                          rows={2}
+                          value={bulkColorPasteText}
+                          onChange={(e) => setBulkColorPasteText(e.target.value)}
+                          placeholder={`Dán danh sách mã màu vào đây, ví dụ:\n100-WHITE\n001-BLACK\n400-ROYAL\nRED-CRIMSON`}
+                          className="w-full p-2.5 text-xs font-mono border border-slate-200 rounded-lg focus:ring-2 focus:ring-emerald-500 outline-none bg-slate-50 focus:bg-white text-slate-800"
+                        />
+                        <div className="flex justify-end">
+                          <button
+                            type="button"
+                            onClick={handleImportBulkColors}
+                            className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs rounded-lg flex items-center gap-1.5 shadow-xs cursor-pointer transition-colors"
+                          >
+                            <Plus className="h-3.5 w-3.5" />
+                            NẠP CỘT MÃ MÀU VÀO DANH SÁCH
+                          </button>
+                        </div>
+                      </div>
+
+                      {/* Single Add & Tags Preview */}
+                      <div className="bg-white p-3 rounded-lg border border-emerald-200 space-y-3">
+                        <div className="flex gap-2 items-center">
+                          <input
+                            type="text"
+                            value={newColorName}
+                            onChange={(e) => setNewColorName(e.target.value)}
+                            onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); handleAddSingleColor(); } }}
+                            placeholder="Thêm mã màu đơn lẻ (VD: 100-WHITE)..."
+                            className="flex-1 p-2 text-xs border border-slate-200 rounded-md font-bold uppercase text-slate-800 bg-slate-50 focus:bg-white focus:ring-1 focus:ring-emerald-500 outline-none"
+                          />
+                          <button
+                            type="button"
+                            onClick={handleAddSingleColor}
+                            className="px-4 py-2 bg-slate-800 hover:bg-slate-900 text-white font-bold text-xs rounded-md shrink-0 flex items-center gap-1 cursor-pointer transition-colors"
+                          >
+                            <Plus className="h-3.5 w-3.5" />
+                            Thêm
+                          </button>
+                        </div>
+
+                        {/* Chips */}
+                        <div className="flex flex-wrap items-center gap-1.5 max-h-40 overflow-y-auto pt-1">
+                          {appColorsList.map((color, idx) => (
+                            <span key={idx} className="text-[11px] font-mono font-bold bg-emerald-50 text-emerald-800 border border-emerald-200 px-2.5 py-1 rounded-md flex items-center gap-1.5 shadow-2xs">
+                              {color}
+                              <button
+                                type="button"
+                                onClick={() => handleDeleteColor(idx)}
+                                className="text-emerald-500 hover:text-red-600 cursor-pointer font-bold"
+                                title="Xóa"
+                              >
+                                ×
+                              </button>
+                            </span>
+                          ))}
+                        </div>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="p-4 bg-blue-50/70 rounded-xl border border-blue-200/80 flex items-start gap-3">
+                      <Sparkles className="h-5 w-5 text-blue-600 shrink-0 mt-0.5" />
+                      <div>
+                        <h4 className="text-xs font-extrabold text-blue-900 uppercase">
+                          Cấu hình ô "NHẬP MÃ MÀU" cho {configPartTab === 'detho' ? 'ĐẾ THÔ' : 'ĐẾ PHUN SƠN'}
+                        </h4>
+                        <p className="text-[11px] text-blue-700/90 mt-1 leading-relaxed">
+                          Đối với bộ vị <strong>{configPartTab === 'detho' ? 'Đế thô' : 'Đế phun sơn'}</strong>, khi nhân viên bấm vào ô <strong>"NHẬP MÃ MÀU"</strong> trên form kiểm hàng, hệ thống sẽ tự động hiển thị <strong>danh sách hình thể</strong> ({appSupplierModels.length} hình thể ở mục bên trên) và không hiển thị mã màu. Quản trị viên chỉ cần cập nhật danh sách Xưởng & Hình Thể ở bảng trên.
+                        </p>
+                      </div>
+                    </div>
+                  )}
 
                   <div className="pt-2 flex flex-col sm:flex-row justify-end gap-3">
                     <button

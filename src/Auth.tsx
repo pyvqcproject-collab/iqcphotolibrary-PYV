@@ -47,20 +47,41 @@ export function Auth({ onSignIn }: AuthProps) {
   };
 
   return (
-    <div className="min-h-[100dvh] bg-slate-100 flex flex-col justify-center py-12 pb-[30vh] md:pb-12 sm:px-6 lg:px-8 text-slate-800 font-sans">
-      <div className="sm:mx-auto sm:w-full sm:max-w-md flex flex-col items-center">
-        <div className="flex items-center justify-center mb-6 w-full">
-          <span className="font-extrabold text-3xl tracking-tight text-slate-800">IQC</span>
-          <span className="font-light text-3xl text-slate-600">PHOTO</span>
-        </div>
-        <p className="text-center text-sm text-slate-500 font-medium mb-2">Hệ Thống Báo Cáo Chất Lượng</p>
-      </div>
+    <div className="min-h-[100dvh] bg-slate-900 flex flex-col justify-center py-10 px-4 sm:px-6 lg:px-8 text-slate-100 font-sans relative overflow-hidden">
+      {/* Subtle industrial grid lines background */}
+      <div 
+        className="absolute inset-0 opacity-[0.03] pointer-events-none"
+        style={{
+          backgroundImage: 'linear-gradient(#fff 1px, transparent 1px), linear-gradient(90deg, #fff 1px, transparent 1px)',
+          backgroundSize: '32px 32px'
+        }}
+      />
 
-      <div className="mt-6 sm:mx-auto sm:w-full sm:max-w-md">
-        <div className="bg-white py-8 px-6 shadow-[0_4px_6px_-1px_rgba(0,0,0,0.1)] rounded-xl sm:px-10 border border-slate-200">
+      <div className="sm:mx-auto sm:w-full sm:max-w-md relative z-10">
+        <div className="flex flex-col items-center text-center mb-6">
+          <div className="inline-flex items-center gap-2 px-3 py-1 bg-slate-800 border border-slate-700 rounded text-[11px] font-mono uppercase tracking-wider text-slate-300 mb-4">
+            <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
+            Hệ thống QA/QC Nhà máy
+          </div>
+          <div className="flex items-baseline justify-center gap-1.5">
+            <span className="font-extrabold text-3xl sm:text-4xl tracking-tight text-white font-mono">IQC</span>
+            <span className="font-light text-3xl sm:text-4xl text-slate-400 tracking-tight">PHOTO</span>
+            <span className="text-xs font-mono px-1.5 py-0.5 bg-blue-600/30 text-blue-400 border border-blue-500/40 rounded font-semibold ml-1">v1.4</span>
+          </div>
+          <p className="mt-2 text-xs uppercase tracking-widest text-slate-400 font-semibold">
+            Quality Control & Defect Verification
+          </p>
+        </div>
+
+        <div className="bg-slate-800/90 border border-slate-700/80 rounded-lg p-6 sm:p-8 shadow-xl backdrop-blur-sm">
           <div className="space-y-5">
+            <div className="border-b border-slate-700 pb-3">
+              <h3 className="text-xs font-bold uppercase tracking-wider text-slate-300 font-mono">Xác thực đăng nhập</h3>
+              <p className="text-[11px] text-slate-400 mt-0.5">Sử dụng tài khoản Google doanh nghiệp hoặc tài khoản được cấp phép</p>
+            </div>
+
             {error && (
-              <div className="text-red-800 text-xs bg-red-50 p-3 rounded-md border border-red-200 font-medium">
+              <div className="text-red-300 text-xs bg-red-950/60 p-3 rounded border border-red-800/80 font-medium leading-relaxed">
                 {error}
               </div>
             )}
@@ -69,16 +90,16 @@ export function Auth({ onSignIn }: AuthProps) {
               <button
                 onClick={handleLogin}
                 disabled={loading}
-                className="w-full bg-blue-600 text-white p-3.5 rounded-lg font-semibold border-none flex items-center justify-center gap-2.5 hover:bg-blue-700 transition-colors shadow-sm disabled:opacity-75 disabled:cursor-not-allowed cursor-pointer"
+                className="w-full bg-blue-600 hover:bg-blue-500 active:bg-blue-700 text-white p-3.5 rounded font-mono font-bold text-xs uppercase tracking-wider border border-blue-500/50 flex items-center justify-center gap-3 transition-colors shadow-sm disabled:opacity-60 disabled:cursor-not-allowed cursor-pointer"
               >
                 {loading ? (
                   <>
-                    <Loader2 className="animate-spin -ml-1 h-5 w-5" />
-                    ĐANG XỬ LÝ...
+                    <Loader2 className="animate-spin h-4 w-4" />
+                    ĐANG XÁC THỰC HỆ THỐNG...
                   </>
                 ) : (
                   <>
-                    <svg viewBox="0 0 24 24" width="20" height="20" xmlns="http://www.w3.org/2000/svg">
+                    <svg viewBox="0 0 24 24" width="18" height="18" xmlns="http://www.w3.org/2000/svg">
                       <g transform="matrix(1, 0, 0, 1, 27.009001, -39.238998)">
                         <path fill="#4285F4" d="M -3.264 51.509 C -3.264 50.719 -3.334 49.969 -3.454 49.239 L -14.754 49.239 L -14.754 53.749 L -8.284 53.749 C -8.574 55.229 -9.424 56.479 -10.684 57.329 L -10.684 60.329 L -6.824 60.329 C -4.564 58.239 -3.264 55.159 -3.264 51.509 Z"/>
                         <path fill="#34A853" d="M -14.754 63.239 C -11.514 63.239 -8.804 62.159 -6.824 60.329 L -10.684 57.329 C -11.764 58.049 -13.134 58.489 -14.754 58.489 C -17.884 58.489 -20.534 56.379 -21.484 53.529 L -25.464 53.529 L -25.464 56.619 C -23.494 60.539 -19.444 63.239 -14.754 63.239 Z"/>
@@ -90,6 +111,10 @@ export function Auth({ onSignIn }: AuthProps) {
                   </>
                 )}
               </button>
+            </div>
+
+            <div className="pt-2 text-center">
+              <span className="text-[10px] text-slate-500 font-mono">PYV FACTORY MANAGEMENT SYSTEM • QC SECURE NODE</span>
             </div>
           </div>
         </div>

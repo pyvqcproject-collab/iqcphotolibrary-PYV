@@ -818,6 +818,7 @@ export const QCHistory = React.memo(function QCHistory({ user, token, userProfil
             date: data.date,
             floor: data.floor,
             order: data.order,
+            shoeModel: data.shoeModel || '',
             colorCode: data.colorCode,
             errorName: data.errorName,
             supplier: data.supplier,
@@ -828,6 +829,7 @@ export const QCHistory = React.memo(function QCHistory({ user, token, userProfil
             isDownloaded: data.isDownloaded || false,
             downloadedBy: data.downloadedBy || [],
             part: data.part || '',
+            subPart: data.subPart || '',
             note: data.note || '',
             createdAt: data.createdAt?.toDate ? data.createdAt.toDate().toISOString() : data.createdAt,
             isLocalOnly: false
@@ -1007,11 +1009,13 @@ export const QCHistory = React.memo(function QCHistory({ user, token, userProfil
         date: report.date || '',
         floor: report.floor || '',
         order: report.order || '',
+        shoeModel: report.shoeModel || '',
         colorCode: report.colorCode || '',
         errorName: report.errorName || '',
         supplier: report.supplier || '',
         part: report.part || '',
         subPart: report.subPart || '',
+        employeeName: report.employeeName || '',
         imageUrls: finalImageUrls,
         employeeId: report.employeeId || '',
         employeeEmail: user.email || report.employeeEmail || '',
@@ -1818,6 +1822,10 @@ export const QCHistory = React.memo(function QCHistory({ user, token, userProfil
                       <div className="flex justify-between items-center py-1 border-b border-slate-100">
                         <span className="text-slate-500 uppercase">Xưởng Cung Ứng:</span>
                         <span className="font-bold text-slate-900">{selectedReport.supplier}</span>
+                      </div>
+                      <div className="flex justify-between items-center py-1 border-b border-slate-100">
+                        <span className="text-slate-500 uppercase">Thành Phần Nhỏ:</span>
+                        <span className="font-bold text-blue-700">{selectedReport.subPart || 'N/A'}</span>
                       </div>
                       <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center py-1.5 border-b border-slate-100 gap-1">
                         <span className="text-slate-500 uppercase shrink-0">QC Phụ Trách:</span>

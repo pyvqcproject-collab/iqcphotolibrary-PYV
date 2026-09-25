@@ -46,12 +46,23 @@ import {
   DEFAULT_COLORS_LIST
 } from './components/AdminPanel';
 
-interface ImagePreviewProps {
+export interface DefectPhotoItem {
+  id: string;
   file: File;
-  index: number;
+  errorName: string;
 }
 
-function ImagePreview({ file, index }: ImagePreviewProps) {
+interface ImagePreviewProps {
+  key?: string | number;
+  item: DefectPhotoItem;
+  index: number;
+  availableErrors?: string[];
+  onChangeError?: (newError: string) => void;
+  onRemove: () => void;
+}
+
+function ImagePreview({ item, index, availableErrors, onChangeError, onRemove }: ImagePreviewProps) {
+  const { file, errorName } = item;
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
 
   useEffect(() => {
@@ -70,29 +81,67 @@ function ImagePreview({ file, index }: ImagePreviewProps) {
     };
   }, [file]);
 
-  if (!previewUrl) {
-    return (
-      <div className="flex-1 flex flex-col items-center justify-center p-2 bg-slate-100">
-        <ImageIcon className="h-5 w-5 text-slate-400 mb-1" />
-        <span className="text-[10px] text-slate-500 text-center line-clamp-2 break-all px-1 font-bold">
-          [Ảnh {index + 1}]<br />{file.name}
-        </span>
-      </div>
-    );
-  }
-
   return (
-    <div className="flex-1 w-full h-full relative overflow-hidden bg-slate-950 flex items-center justify-center">
-      <img
-        src={previewUrl}
-        alt={file.name}
-        referrerPolicy="no-referrer"
-        className="w-full h-full object-cover select-none"
-      />
-      <div className="absolute inset-x-0 bottom-0 bg-black/60 p-1.5 backdrop-blur-3xs text-center">
-        <p className="text-[9px] text-white truncate px-1 font-bold" title={file.name}>
-          [Ảnh {index + 1}]<br />{file.name}
-        </p>
+    <div className="relative group bg-slate-900 rounded-lg overflow-hidden border border-slate-700 flex flex-col shadow-xs">
+      <div className="relative aspect-4/3 w-full bg-slate-950 flex items-center justify-center overflow-hidden">
+        {previewUrl ? (
+          <img
+            src={previewUrl}
+            alt={file.name}
+            referrerPolicy="no-referrer"
+            className="w-full h-full object-cover select-none transition-transform duration-200 group-hover:scale-[1.02]"
+          />
+        ) : (
+          <div className="flex flex-col items-center justify-center p-2 text-slate-400">
+            <ImageIcon className="h-5 w-5 mb-1" />
+            <span className="text-[10px] font-mono">Đang tải...</span>
+          </div>
+        )}
+
+        <button
+          type="button"
+          onClick={onRemove}
+          className="absolute top-1.5 right-1.5 bg-red-600/90 hover:bg-red-700 text-white rounded p-1 shadow cursor-pointer border-none flex items-center justify-center z-10 transition-colors"
+          title="Xóa ảnh này"
+        >
+          <X className="h-3.5 w-3.5" />
+        </button>
+
+        <div className="absolute top-1.5 left-1.5 bg-black/75 backdrop-blur-xs text-white font-mono text-[10px] px-1.5 py-0.5 rounded font-bold pointer-events-none">
+          #{index + 1}
+        </div>
+      </div>
+
+      {/* Ghi chú tên lỗi bên dưới hình */}
+      <div className="p-2 bg-slate-900 border-t border-slate-800 flex flex-col gap-1 text-left">
+        <div className="flex items-center justify-between gap-1">
+          <span className="text-[10px] font-mono font-bold text-red-400 uppercase flex items-center gap-1 shrink-0">
+            <span className="w-1.5 h-1.5 rounded-full bg-red-500 shrink-0"></span>
+            Lỗi:
+          </span>
+          {availableErrors && availableErrors.length > 1 ? (
+            <select
+              value={errorName}
+              onChange={e => onChangeError?.(e.target.value)}
+              className="text-[11px] font-mono font-bold bg-slate-800 text-amber-300 border border-slate-700 hover:border-amber-400 rounded px-1.5 py-0.5 outline-none cursor-pointer truncate max-w-[145px] transition-colors"
+              title="Đổi loại lỗi riêng cho hình ảnh này"
+            >
+              {availableErrors.map(err => (
+                <option key={err} value={err}>
+                  {err}
+                </option>
+              ))}
+            </select>
+          ) : (
+            <span className="text-[11px] font-mono font-bold text-amber-300 truncate" title={errorName}>
+              {errorName || 'Lỗi chung'}
+            </span>
+          )}
+        </div>
+        <div className="text-[9px] text-slate-400 font-mono truncate flex items-center justify-between">
+          <span className="truncate" title={file.name}>{file.name}</span>
+          <span className="shrink-0 text-slate-500 ml-1 font-semibold">{(file.size / 1024).toFixed(0)} KB</span>
+        </div>
       </div>
     </div>
   );
@@ -122,6 +171,8 @@ export function QCForm({ user, token, onLogout }: QCFormProps) {
   const [supplier, setSupplier] = useState('');
   const [note, setNote] = useState('');
   const [files, setFiles] = useState<File[]>([]);
+  const [defectPhotos, setDefectPhotos] = useState<DefectPhotoItem[]>([]);
+  const [targetUploadError, setTargetUploadError] = useState<string>('');
   
   // Custom states added for requested enhancements
   const [userProfile, setUserProfile] = useState<QCUser | null>(null);
@@ -133,6 +184,22 @@ export function QCForm({ user, token, onLogout }: QCFormProps) {
   const [supplierOption, setSupplierOption] = useState('');
   const [errorOption, setErrorOption] = useState('');
   const [customErrorInput, setCustomErrorInput] = useState('');
+  const [selectedErrors, setSelectedErrors] = useState<string[]>([]);
+  const [keepOrderInfo, setKeepOrderInfo] = useState<boolean>(true);
+  const [lastOrderInfo, setLastOrderInfo] = useState<{
+    order: string;
+    isNoPo: boolean;
+    colorCode: string;
+    shoeModel: string;
+    part: string;
+    subPart: string;
+    subPartOption: string;
+    supplier: string;
+    supplierOption: string;
+    floor: string;
+    floorOption: string;
+    date: string;
+  } | null>(null);
   
   const [colorOption, setColorOption] = useState('');
   const [customColorInput, setCustomColorInput] = useState('');
@@ -633,14 +700,38 @@ export function QCForm({ user, token, onLogout }: QCFormProps) {
 
   // Keep final errorName state in sync with dropdown selection or typed input
   useEffect(() => {
-    if (errorOption === 'CUSTOM') {
+    if (selectedErrors.length > 0) {
+      setErrorName(selectedErrors.join(', '));
+    } else if (errorOption === 'CUSTOM') {
       setErrorName(customErrorInput.trim());
     } else if (errorOption) {
       setErrorName(errorOption);
     } else {
       setErrorName('');
     }
-  }, [errorOption, customErrorInput]);
+  }, [selectedErrors, errorOption, customErrorInput]);
+
+  const handleAddError = (err: string) => {
+    const trimmed = err.trim();
+    if (!trimmed) return;
+    if (!selectedErrors.includes(trimmed)) {
+      setSelectedErrors(prev => [...prev, trimmed]);
+    }
+  };
+
+  const handleRemoveError = (err: string) => {
+    setSelectedErrors(prev => prev.filter(e => e !== err));
+  };
+
+  const handleToggleError = (err: string) => {
+    const trimmed = err.trim();
+    if (!trimmed) return;
+    if (selectedErrors.includes(trimmed)) {
+      handleRemoveError(trimmed);
+    } else {
+      handleAddError(trimmed);
+    }
+  };
 
   // Check if current part is Sole (Đế thô or Đế phun sơn)
   const isSolePart = checkIsSolePart(currentPart || userProfile?.part || '');
@@ -788,13 +879,61 @@ export function QCForm({ user, token, onLogout }: QCFormProps) {
     }
   }, [colorCode, colorConfigList]);
 
+  const activeErrors = useMemo(() => {
+    if (selectedErrors.length > 0) return selectedErrors;
+    if (errorName.trim()) return [errorName.trim()];
+    return [];
+  }, [selectedErrors, errorName]);
+
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (e.target.files) {
-      setFiles((prev) => [...prev, ...Array.from(e.target.files!)]);
+    if (e.target.files && e.target.files.length > 0) {
+      const selectedFiles = Array.from(e.target.files) as File[];
+      const assignedError = targetUploadError || selectedErrors[0] || errorName.trim() || 'Lỗi chung';
+      
+      const newItems: DefectPhotoItem[] = selectedFiles.map((file: File, i: number) => ({
+        id: `photo_${Date.now()}_${Math.random().toString(36).substring(2, 7)}_${i}`,
+        file,
+        errorName: assignedError
+      }));
+
+      setDefectPhotos((prev) => {
+        const next = [...prev, ...newItems];
+        setFiles(next.map(p => p.file));
+        return next;
+      });
+
+      e.target.value = '';
+      setTargetUploadError('');
+    }
+  };
+
+  const removePhoto = (id: string) => {
+    setDefectPhotos((prev) => {
+      const next = prev.filter(p => p.id !== id);
+      setFiles(next.map(p => p.file));
+      return next;
+    });
+  };
+
+  const updatePhotoError = (id: string, newError: string) => {
+    setDefectPhotos((prev) => prev.map(p => p.id === id ? { ...p, errorName: newError } : p));
+  };
+
+  const triggerUploadForError = (errName: string, source: 'camera' | 'file') => {
+    setTargetUploadError(errName);
+    if (source === 'camera') {
+      cameraInputRef.current?.click();
+    } else {
+      fileInputRef.current?.click();
     }
   };
 
   const removeFile = (index: number) => {
+    setDefectPhotos((prev) => {
+      const next = prev.filter((_, i) => i !== index);
+      setFiles(next.map(p => p.file));
+      return next;
+    });
     setFiles((prev) => prev.filter((_, i) => i !== index));
   };
 
@@ -854,27 +993,39 @@ export function QCForm({ user, token, onLogout }: QCFormProps) {
       setError('Vui lòng chọn Xưởng cung ứng. Không được để trống!');
       return;
     }
-    if (!errorName.trim()) {
-      setError('Vui lòng chọn hoặc nhập Loại lỗi kỹ thuật. Không được để trống!');
+    const finalErrors = selectedErrors.length > 0 
+      ? selectedErrors 
+      : (errorName.trim() ? [errorName.trim()] : []);
+
+    if (finalErrors.length === 0) {
+      setError('Vui lòng chọn hoặc nhập ít nhất 1 loại lỗi kỹ thuật cho đơn hàng.');
       return;
     }
-    if (files.length === 0) {
+
+    const effectiveErrorName = finalErrors.join(', ');
+
+    const reportFiles = defectPhotos.length > 0 ? defectPhotos.map(p => p.file) : [...files];
+    const reportImageErrors = defectPhotos.length > 0 
+      ? defectPhotos.map(p => p.errorName) 
+      : reportFiles.map(() => effectiveErrorName);
+
+    if (reportFiles.length === 0) {
       setError('Vui lòng chọn hoặc chụp ít nhất 1 hình ảnh báo cáo lỗi.');
       return;
     }
     
     setError('');
     setSuccess(true);
-    setSuccessMessage('Báo cáo đang được xử lý ngầm. Bạn có thể tiếp tục xem và tạo biên bản mới ngay lập tức.');
     
-    const reportFiles = [...files];
     const reportPayloadBase: any = {
       date,
       floor,
       order: order.trim(),
       colorCode: effectiveColor,
       shoeModel: effectiveModel,
-      errorName: errorName.trim(),
+      errorName: effectiveErrorName,
+      errorNames: finalErrors,
+      imageErrors: reportImageErrors,
       supplier: supplier.trim(),
       part: finalPart,
       subPart: subPart.trim(),
@@ -889,25 +1040,60 @@ export function QCForm({ user, token, onLogout }: QCFormProps) {
     const taskId = typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function'
       ? crypto.randomUUID()
       : `task_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
-    const taskTitle = `PO: ${order} - ${effectiveModel || effectiveColor} (${floor})`;
+    const errorSummary = finalErrors.length > 1 ? `${finalErrors.length} lỗi (${finalErrors[0]}...)` : finalErrors[0];
+    const taskTitle = `PO: ${order} - ${effectiveModel || effectiveColor} [${errorSummary}] (${floor})`;
 
     setBackgroundTasks(prev => [...prev, { id: taskId, title: taskTitle, progress: 0, status: 'uploading' }]);
 
-    // Reset form immediately
-    setOrder('');
-    setIsNoPo(false);
-    setColorCode('');
-    setColorOption('');
-    setCustomColorInput('');
-    setShoeModel('');
-    setShoeModelOption('');
-    setErrorOption('');
-    setCustomErrorInput('');
-    setSubPart('');
-    setSubPartOption('');
-    setNote('');
-    setFiles([]);
-    if (fileInputRef.current) fileInputRef.current.value = '';
+    // Save last order info for quick restore
+    setLastOrderInfo({
+      order: order.trim(),
+      isNoPo,
+      colorCode,
+      shoeModel,
+      part: finalPart,
+      subPart,
+      subPartOption,
+      supplier,
+      supplierOption,
+      floor,
+      floorOption,
+      date
+    });
+
+    // Reset form: respect keepOrderInfo
+    if (keepOrderInfo) {
+      setSelectedErrors([]);
+      setErrorOption('');
+      setCustomErrorInput('');
+      setErrorName('');
+      setNote('');
+      setFiles([]);
+      setDefectPhotos([]);
+      if (fileInputRef.current) fileInputRef.current.value = '';
+      if (cameraInputRef.current) cameraInputRef.current.value = '';
+      setSuccessMessage(`Đã gửi báo cáo thành công! Đã giữ lại thông tin đơn hàng PO "${order}" để bạn tiếp tục nhập lỗi khác.`);
+    } else {
+      setOrder('');
+      setIsNoPo(false);
+      setColorCode('');
+      setColorOption('');
+      setCustomColorInput('');
+      setShoeModel('');
+      setShoeModelOption('');
+      setSelectedErrors([]);
+      setErrorOption('');
+      setCustomErrorInput('');
+      setErrorName('');
+      setSubPart('');
+      setSubPartOption('');
+      setNote('');
+      setFiles([]);
+      setDefectPhotos([]);
+      if (fileInputRef.current) fileInputRef.current.value = '';
+      if (cameraInputRef.current) cameraInputRef.current.value = '';
+      setSuccessMessage('Báo cáo đang được xử lý ngầm. Bạn có thể tiếp tục xem và tạo biên bản mới ngay lập tức.');
+    }
 
     // Run async upload without blocking
     processBackgroundReport(taskId, taskTitle, reportFiles, reportPayloadBase);
@@ -958,7 +1144,10 @@ export function QCForm({ user, token, onLogout }: QCFormProps) {
         }
         
         const modelPart = safeModel ? `${safeModel}_` : '';
-        const fileName = `${partPrefix}_${safeOrder}_${modelPart}${safeColor}_${safeError}_${safeSupplier}_${safeFloor}_${i + 1}_${timestamp}.jpg`;
+        const specificError = (reportPayloadBase.imageErrors && reportPayloadBase.imageErrors[i])
+          ? sanitizeName(reportPayloadBase.imageErrors[i])
+          : safeError;
+        const fileName = `${partPrefix}_${safeOrder}_${modelPart}${safeColor}_${specificError}_${safeSupplier}_${safeFloor}_${i + 1}_${timestamp}.jpg`;
         let downloadUrl = '';
         
         if (!navigator.onLine) {
@@ -1646,42 +1835,154 @@ export function QCForm({ user, token, onLogout }: QCFormProps) {
                 </div>
               </div>
 
-              {/* HÀNG 2: TÊN LOẠI LỖI KỸ THUẬT: DROPDOWN OR ADD NEW */}
+              {/* HÀNG 2: TÊN LOẠI LỖI KỸ THUẬT: MULTI-SELECT OR ADD NEW */}
               <div className="flex flex-col gap-1.5 text-xs">
                 <div className="flex items-center justify-between">
                   <label htmlFor="errorDropdown" className="text-[11px] font-bold text-slate-700 uppercase tracking-wider font-mono">
                     Loại lỗi kỹ thuật <span className="text-red-500">*</span>
                   </label>
+                  <span className="text-[10px] text-slate-500 font-mono">
+                    {selectedErrors.length > 0 ? (
+                      <span className="text-red-700 font-bold bg-red-50 border border-red-200 px-1.5 py-0.2 rounded">
+                        Đã chọn: {selectedErrors.length} lỗi
+                      </span>
+                    ) : (
+                      'Có thể chọn nhiều lỗi'
+                    )}
+                  </span>
                 </div>
+
+                {/* Selected Defect Badges List */}
+                {selectedErrors.length > 0 && (
+                  <div className="flex flex-wrap items-center gap-1.5 p-2 bg-slate-50 border border-slate-200 rounded">
+                    {selectedErrors.map((err) => {
+                      const count = defectPhotos.filter(p => p.errorName === err).length;
+                      return (
+                        <span
+                          key={err}
+                          className="inline-flex items-center gap-1 px-2 py-0.5 bg-red-50 text-red-800 border border-red-200 rounded text-xs font-bold font-mono"
+                        >
+                          <span className="w-1.5 h-1.5 rounded-full bg-red-600 shrink-0"></span>
+                          <span>{err}</span>
+                          <span className="text-[10px] bg-red-100 text-red-700 px-1 rounded font-normal" title={`${count} ảnh đã chụp cho lỗi này`}>
+                            {count} ảnh
+                          </span>
+                          <button
+                            type="button"
+                            onClick={() => triggerUploadForError(err, 'camera')}
+                            className="inline-flex items-center gap-0.5 text-[10px] bg-red-200/80 hover:bg-red-300 text-red-900 px-1 py-0.5 rounded cursor-pointer transition-colors ml-0.5"
+                            title={`Chụp/tải ảnh riêng cho lỗi "${err}"`}
+                          >
+                            <Camera className="h-2.5 w-2.5" />
+                            <span>+Ảnh</span>
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => handleRemoveError(err)}
+                            className="text-red-400 hover:text-red-700 ml-1 font-bold cursor-pointer"
+                            title="Bỏ chọn lỗi này"
+                          >
+                            ✕
+                          </button>
+                        </span>
+                      );
+                    })}
+                    <button
+                      type="button"
+                      onClick={() => setSelectedErrors([])}
+                      className="text-[10px] text-slate-400 hover:text-red-600 font-mono ml-auto self-center cursor-pointer underline"
+                    >
+                      Xóa hết
+                    </button>
+                  </div>
+                )}
                 
                 <select
                   id="errorDropdown"
-                  required
                   value={errorOption}
                   onChange={e => {
-                    setErrorOption(e.target.value);
-                    if (e.target.value !== 'CUSTOM') setCustomErrorInput('');
+                    const val = e.target.value;
+                    if (val === 'CUSTOM') {
+                      setErrorOption('CUSTOM');
+                    } else if (val) {
+                      handleAddError(val);
+                      setErrorOption('');
+                    }
                   }}
                   className="h-11 sm:h-10 px-3 bg-white border border-slate-300 rounded hover:border-slate-400 focus:bg-white focus:ring-1 focus:ring-blue-600 focus:border-blue-600 outline-none transition-all font-semibold text-slate-900 text-sm cursor-pointer"
                 >
-                  <option value="">-- Chọn loại lỗi đang bị * --</option>
-                  {errorOptions.map((eName) => (
-                    <option key={eName} value={eName}>
-                      {eName}
-                    </option>
-                  ))}
+                  <option value="">
+                    {selectedErrors.length > 0 ? '+ Chọn thêm lỗi khác vào đơn hàng...' : '-- Chọn loại lỗi đang bị * --'}
+                  </option>
+                  {errorOptions.map((eName) => {
+                    const isPicked = selectedErrors.includes(eName);
+                    return (
+                      <option key={eName} value={eName} disabled={isPicked}>
+                        {isPicked ? `✓ ${eName} (Đã thêm)` : eName}
+                      </option>
+                    );
+                  })}
                   {isAdmin && <option value="CUSTOM">➕ Tự viết / Thêm tên lỗi mới...</option>}
                 </select>
 
                 {errorOption === 'CUSTOM' && (
-                  <input
-                    type="text"
-                    required
-                    placeholder="Nhập chi tiết tên lỗi kỹ thuật mới..."
-                    value={customErrorInput}
-                    onChange={e => setCustomErrorInput(e.target.value)}
-                    className="mt-1 h-11 sm:h-10 px-3 border border-blue-400 rounded focus:ring-1 focus:ring-blue-600 outline-none transition-all font-semibold bg-blue-50/20 text-slate-900 text-sm"
-                  />
+                  <div className="flex gap-2 mt-1">
+                    <input
+                      type="text"
+                      placeholder="Nhập chi tiết tên lỗi kỹ thuật mới..."
+                      value={customErrorInput}
+                      onChange={e => setCustomErrorInput(e.target.value)}
+                      onKeyDown={e => {
+                        if (e.key === 'Enter') {
+                          e.preventDefault();
+                          if (customErrorInput.trim()) {
+                            handleAddError(customErrorInput.trim());
+                            setCustomErrorInput('');
+                            setErrorOption('');
+                          }
+                        }
+                      }}
+                      className="flex-1 h-11 sm:h-10 px-3 border border-blue-400 rounded focus:ring-1 focus:ring-blue-600 outline-none transition-all font-semibold bg-blue-50/20 text-slate-900 text-sm"
+                      autoFocus
+                    />
+                    <button
+                      type="button"
+                      onClick={() => {
+                        if (customErrorInput.trim()) {
+                          handleAddError(customErrorInput.trim());
+                          setCustomErrorInput('');
+                          setErrorOption('');
+                        }
+                      }}
+                      className="px-3 bg-blue-600 hover:bg-blue-700 text-white font-mono font-bold text-xs rounded cursor-pointer shrink-0"
+                    >
+                      + THÊM LỖI
+                    </button>
+                  </div>
+                )}
+
+                {/* Quick select chips for rapid 1-tap defect tagging */}
+                {errorOptions.length > 0 && (
+                  <div className="flex items-center gap-1.5 overflow-x-auto py-1 scrollbar-none">
+                    <span className="text-[10px] text-slate-400 font-mono uppercase shrink-0">CHỌN NHANH:</span>
+                    {errorOptions.slice(0, 8).map(eName => {
+                      const isSelected = selectedErrors.includes(eName);
+                      return (
+                        <button
+                          key={eName}
+                          type="button"
+                          onClick={() => handleToggleError(eName)}
+                          className={`text-xs font-semibold px-2 py-0.5 rounded border whitespace-nowrap transition-colors cursor-pointer shrink-0 ${
+                            isSelected 
+                              ? 'bg-red-50 text-red-700 border-red-300 font-bold' 
+                              : 'bg-slate-100 hover:bg-blue-50 hover:text-blue-700 text-slate-700 border-slate-200'
+                          }`}
+                        >
+                          {isSelected ? `✓ ${eName}` : eName}
+                        </button>
+                      );
+                    })}
+                  </div>
                 )}
               </div>
 
@@ -1699,6 +2000,19 @@ export function QCForm({ user, token, onLogout }: QCFormProps) {
                   className="p-3 bg-white border border-slate-300 rounded hover:border-slate-400 focus:bg-white focus:ring-1 focus:ring-blue-600 focus:border-blue-600 outline-none transition-all text-slate-900 text-sm resize-y min-h-[70px]"
                 />
               </div>
+
+              {/* Tùy chọn giữ thông tin đơn hàng để thêm nhiều lỗi */}
+              <div className="pt-2 border-t border-slate-200">
+                <label className="flex items-center gap-2 cursor-pointer select-none text-xs font-semibold text-slate-700 hover:text-slate-900">
+                  <input
+                    type="checkbox"
+                    checked={keepOrderInfo}
+                    onChange={e => setKeepOrderInfo(e.target.checked)}
+                    className="rounded text-blue-600 focus:ring-blue-500 h-4 w-4 cursor-pointer"
+                  />
+                  <span>Giữ thông tin đơn hàng sau khi gửi (để tiếp tục thêm lỗi khác cho PO này)</span>
+                </label>
+              </div>
             </section>
 
             {/* Upload Card: Evidence */}
@@ -1709,12 +2023,12 @@ export function QCForm({ user, token, onLogout }: QCFormProps) {
                   <h2 className="m-0 text-xs sm:text-sm font-bold text-slate-900 font-mono uppercase tracking-wider">Minh Chứng Hình Ảnh Lỗi</h2>
                 </div>
                 <span className="text-[11px] font-mono text-slate-500 font-bold">
-                  {files.length} ẢNH
+                  {defectPhotos.length} ẢNH
                 </span>
               </div>
 
               {success && (
-                <div className="rounded bg-emerald-50 p-3.5 border border-emerald-200 flex flex-col gap-1 shrink-0 animate-in fade-in duration-200">
+                <div className="rounded bg-emerald-50 p-3.5 border border-emerald-200 flex flex-col gap-1.5 shrink-0 animate-in fade-in duration-200">
                   <div className="flex items-center gap-2">
                     <CheckCircle className="h-4 w-4 text-emerald-600 shrink-0" />
                     <span className="text-xs font-bold text-emerald-900 font-mono">ĐÃ GỬI BÁO CÁO THÀNH CÔNG!</span>
@@ -1722,6 +2036,28 @@ export function QCForm({ user, token, onLogout }: QCFormProps) {
                   <p className="text-xs text-emerald-800 ml-6 leading-relaxed">
                     {successMessage || 'Biên bản đã được lưu trữ và tiến hành tải ngầm lên hệ thống.'}
                   </p>
+                  {lastOrderInfo && !order && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setOrder(lastOrderInfo.order);
+                        setIsNoPo(lastOrderInfo.isNoPo);
+                        setColorCode(lastOrderInfo.colorCode);
+                        setShoeModel(lastOrderInfo.shoeModel);
+                        setSubPart(lastOrderInfo.subPart);
+                        setSubPartOption(lastOrderInfo.subPartOption);
+                        setSupplier(lastOrderInfo.supplier);
+                        setSupplierOption(lastOrderInfo.supplierOption);
+                        setFloor(lastOrderInfo.floor);
+                        setFloorOption(lastOrderInfo.floorOption);
+                        setDate(lastOrderInfo.date);
+                      }}
+                      className="mt-1 ml-6 self-start text-xs font-mono font-bold text-blue-800 bg-white hover:bg-blue-50 border border-blue-300 py-1.5 px-3 rounded flex items-center gap-1.5 cursor-pointer transition-colors shadow-2xs"
+                    >
+                      <PlusCircle className="h-3.5 w-3.5 text-blue-600" />
+                      Tiếp tục thêm lỗi khác cho đơn vừa nhập (PO: {lastOrderInfo.order})
+                    </button>
+                  )}
                 </div>
               )}
 
@@ -1729,6 +2065,67 @@ export function QCForm({ user, token, onLogout }: QCFormProps) {
                 <div className="rounded bg-red-50 p-3.5 border border-red-200 shrink-0 flex items-start gap-2 text-xs text-red-900 font-semibold leading-relaxed">
                   <AlertCircle className="h-4 w-4 text-red-600 shrink-0 mt-0.5" />
                   <span>{error}</span>
+                </div>
+              )}
+
+              {/* Bộ chọn / Tải ảnh riêng biệt cho từng lỗi */}
+              {selectedErrors.length > 1 && (
+                <div className="p-2.5 bg-slate-50 border border-slate-200 rounded-lg flex flex-col gap-1.5 shrink-0">
+                  <div className="flex items-center justify-between">
+                    <span className="text-[11px] font-mono font-bold text-slate-700 uppercase flex items-center gap-1">
+                      <Filter className="h-3 w-3 text-blue-600" />
+                      Tải ảnh riêng cho từng lỗi:
+                    </span>
+                    {targetUploadError && (
+                      <button
+                        type="button"
+                        onClick={() => setTargetUploadError('')}
+                        className="text-[10px] text-slate-400 hover:text-slate-600 underline font-mono cursor-pointer"
+                      >
+                        Đặt lại mặc định
+                      </button>
+                    )}
+                  </div>
+                  <div className="flex flex-wrap items-center gap-1.5">
+                    <button
+                      type="button"
+                      onClick={() => setTargetUploadError('')}
+                      className={`px-2 py-1 rounded text-xs font-mono font-bold transition-all cursor-pointer ${
+                        !targetUploadError
+                          ? 'bg-blue-600 text-white shadow-2xs'
+                          : 'bg-white text-slate-700 border border-slate-200 hover:bg-slate-100'
+                      }`}
+                    >
+                      Tất cả ({defectPhotos.length})
+                    </button>
+                    {selectedErrors.map(err => {
+                      const count = defectPhotos.filter(p => p.errorName === err).length;
+                      const isActive = targetUploadError === err;
+                      return (
+                        <button
+                          key={err}
+                          type="button"
+                          onClick={() => setTargetUploadError(err)}
+                          className={`px-2 py-1 rounded text-xs font-mono font-bold transition-all cursor-pointer flex items-center gap-1 ${
+                            isActive
+                              ? 'bg-red-600 text-white shadow-2xs'
+                              : 'bg-white text-red-800 border border-red-200 hover:bg-red-50'
+                          }`}
+                        >
+                          <span>{err}</span>
+                          <span className={`text-[10px] px-1 rounded-full font-bold ${isActive ? 'bg-red-700 text-white' : 'bg-red-100 text-red-700'}`}>
+                            {count}
+                          </span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                  {targetUploadError && (
+                    <div className="text-[11px] text-red-700 font-mono flex items-center gap-1 pt-0.5">
+                      <span className="w-1.5 h-1.5 rounded-full bg-red-600 animate-pulse"></span>
+                      Ảnh chụp/tải tiếp theo sẽ gán cho lỗi: <strong className="underline">{targetUploadError}</strong>
+                    </div>
+                  )}
                 </div>
               )}
 
@@ -1776,6 +2173,30 @@ export function QCForm({ user, token, onLogout }: QCFormProps) {
               {/* Drag and Drop Zone */}
               <div
                 onClick={() => fileInputRef.current?.click()}
+                onDragOver={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                }}
+                onDrop={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
+                    const droppedFiles = (Array.from(e.dataTransfer.files) as File[]).filter((f: File) => f.type.startsWith('image/'));
+                    if (droppedFiles.length > 0) {
+                      const assignedError = targetUploadError || selectedErrors[0] || errorName.trim() || 'Lỗi chung';
+                      const newItems: DefectPhotoItem[] = droppedFiles.map((file: File, i: number) => ({
+                        id: `photo_${Date.now()}_${Math.random().toString(36).substring(2, 7)}_${i}`,
+                        file,
+                        errorName: assignedError
+                      }));
+                      setDefectPhotos(prev => {
+                        const next = [...prev, ...newItems];
+                        setFiles(next.map(p => p.file));
+                        return next;
+                      });
+                    }
+                  }
+                }}
                 className="border-2 border-dashed border-slate-300 hover:border-blue-500 bg-slate-50/70 hover:bg-blue-50/20 cursor-pointer rounded p-5 text-center transition-all shrink-0 select-none"
               >
                 <div className="flex flex-col items-center justify-center space-y-1">
@@ -1784,27 +2205,24 @@ export function QCForm({ user, token, onLogout }: QCFormProps) {
                     Kéo thả ảnh hoặc nhấn để tải lên
                   </div>
                   <div className="text-[11px] text-slate-500 font-mono">
-                    Nén tự động chuẩn HD • Tối ưu băng thông mạng nhà máy
+                    {targetUploadError ? `Đang gán cho lỗi: ${targetUploadError} • ` : ''}Nén tự động chuẩn HD • Tối ưu băng thông mạng nhà máy
                   </div>
                 </div>
               </div>
 
               {/* Files grid preview */}
-              {files.length > 0 ? (
-                <div className="flex-1 overflow-y-auto min-h-[140px] max-h-[300px]">
+              {defectPhotos.length > 0 ? (
+                <div className="flex-1 overflow-y-auto min-h-[140px] max-h-[340px]">
                   <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5 pr-1 pb-2">
-                    {files.map((file, index) => (
-                      <div key={`${file.name}-${index}`} className="relative group aspect-square bg-slate-900 rounded overflow-hidden border border-slate-200 flex flex-col shadow-xs">
-                        <ImagePreview file={file} index={index} />
-                        <button
-                          type="button"
-                          onClick={() => removeFile(index)}
-                          className="absolute top-1 right-1 bg-red-600 hover:bg-red-700 text-white rounded p-1 shadow cursor-pointer border-none flex items-center justify-center z-10 transition-colors"
-                          title="Xóa ảnh này"
-                        >
-                          <X className="h-3.5 w-3.5" />
-                        </button>
-                      </div>
+                    {defectPhotos.map((item, index) => (
+                      <ImagePreview
+                        key={item.id}
+                        item={item}
+                        index={index}
+                        availableErrors={selectedErrors.length > 0 ? selectedErrors : (errorName.trim() ? [errorName.trim()] : [])}
+                        onChangeError={(newError) => updatePhotoError(item.id, newError)}
+                        onRemove={() => removePhoto(item.id)}
+                      />
                     ))}
                   </div>
                 </div>

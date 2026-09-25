@@ -34,7 +34,8 @@ import {
   Save,
   Undo2,
   ShieldCheck,
-  AlertTriangle
+  AlertTriangle,
+  User as UserIcon
 } from 'lucide-react';
 import { format, parseISO } from 'date-fns';
 import * as ExcelJS from 'exceljs';
@@ -46,6 +47,7 @@ interface QCReport {
   date: string;
   floor: string;
   order: string;
+  shoeModel?: string;
   colorCode: string;
   errorName: string;
   supplier: string;
@@ -257,6 +259,7 @@ export const QCHistory = React.memo(function QCHistory({ user, token, userProfil
   const [editDate, setEditDate] = useState('');
   const [editFloor, setEditFloor] = useState('');
   const [editOrder, setEditOrder] = useState('');
+  const [editShoeModel, setEditShoeModel] = useState('');
   const [editColorCode, setEditColorCode] = useState('');
   const [editErrorName, setEditErrorName] = useState('');
   const [editSupplier, setEditSupplier] = useState('');
@@ -284,6 +287,7 @@ export const QCHistory = React.memo(function QCHistory({ user, token, userProfil
     setEditDate(selectedReport.date);
     setEditFloor(selectedReport.floor);
     setEditOrder(selectedReport.order);
+    setEditShoeModel(selectedReport.shoeModel || '');
     setEditColorCode(selectedReport.colorCode);
     setEditErrorName(selectedReport.errorName);
     setEditSupplier(selectedReport.supplier);
@@ -316,6 +320,7 @@ export const QCHistory = React.memo(function QCHistory({ user, token, userProfil
                 date: editDate,
                 floor: editFloor,
                 order: editOrder,
+                shoeModel: editShoeModel.trim(),
                 colorCode: editColorCode,
                 errorName: editErrorName,
                 supplier: editSupplier,
@@ -334,6 +339,7 @@ export const QCHistory = React.memo(function QCHistory({ user, token, userProfil
           date: editDate,
           floor: editFloor,
           order: editOrder,
+          shoeModel: editShoeModel.trim(),
           colorCode: editColorCode,
           errorName: editErrorName,
           supplier: editSupplier,
@@ -351,6 +357,7 @@ export const QCHistory = React.memo(function QCHistory({ user, token, userProfil
           date: editDate,
           floor: editFloor,
           order: editOrder,
+          shoeModel: editShoeModel.trim(),
           colorCode: editColorCode,
           errorName: editErrorName,
           supplier: editSupplier,
@@ -364,6 +371,7 @@ export const QCHistory = React.memo(function QCHistory({ user, token, userProfil
           date: editDate,
           floor: editFloor,
           order: editOrder,
+          shoeModel: editShoeModel.trim(),
           colorCode: editColorCode,
           errorName: editErrorName,
           supplier: editSupplier,
@@ -521,6 +529,7 @@ export const QCHistory = React.memo(function QCHistory({ user, token, userProfil
       // Define columns
       worksheet.columns = [
         { header: 'PO', key: 'po', width: 15 },
+        { header: 'Hình thể', key: 'shoeModel', width: 16 },
         { header: 'Mã Màu', key: 'color', width: 15 },
         { header: 'Lỗi', key: 'error', width: 25 },
         { header: 'Khu vực', key: 'floor', width: 15 },
@@ -545,6 +554,7 @@ export const QCHistory = React.memo(function QCHistory({ user, token, userProfil
         const rowIndex = i + 2; 
         const row = worksheet.addRow({
           po: report.order,
+          shoeModel: report.shoeModel || '',
           color: report.colorCode,
           error: report.errorName,
           floor: report.floor,
@@ -562,7 +572,7 @@ export const QCHistory = React.memo(function QCHistory({ user, token, userProfil
           worksheet.getRow(rowIndex).height = 100; // row height 100
           
           for (let imgIndex = 0; imgIndex < report.imageUrls.length; imgIndex++) {
-            const colIndex = imgIndex + 11; // Col L (11, 0-indexed). Columns are: 0:po, 1:color, 2:error, 3:floor, 4:supplier, 5:part, 6:subPart, 7:date, 8:reporter, 9:reporterName, 10:note. Images start at 11.
+            const colIndex = imgIndex + 12; // Col M (12, 0-indexed) because of shoeModel column.
             
             // Ensure header exists for extra images
             if (imgIndex > 0) {
@@ -689,12 +699,14 @@ export const QCHistory = React.memo(function QCHistory({ user, token, userProfil
     const safePart = sanitizeName(selectedReport.part || 'Khong_Bo_Vi');
     const safeSubPart = selectedReport.subPart ? sanitizeName(selectedReport.subPart) : '';
     const safeOrder = sanitizeName(selectedReport.order);
+    const safeModel = selectedReport.shoeModel ? sanitizeName(selectedReport.shoeModel) : '';
     const safeColor = sanitizeName(selectedReport.colorCode);
     const safeError = sanitizeName(selectedReport.errorName);
     const safeSupplier = sanitizeName(selectedReport.supplier);
     const safeFloor = sanitizeName(selectedReport.floor);
     const partPrefix = safeSubPart ? `${safePart}_${safeSubPart}` : safePart;
-    const namePrefix = `${partPrefix}_${safeOrder}_${safeColor}_${safeError}_${safeSupplier}_${safeFloor}`;
+    const modelPrefix = safeModel ? `${safeModel}_` : '';
+    const namePrefix = `${partPrefix}_${safeOrder}_${modelPrefix}${safeColor}_${safeError}_${safeSupplier}_${safeFloor}`;
     
     // We already have 'getBase64ImageFromUrl' which handles the CORS/object URL properly
     const actualDownloadUrl = loadedImageUrls[activeDetailImageIndex] || objectUrl;
@@ -717,12 +729,14 @@ export const QCHistory = React.memo(function QCHistory({ user, token, userProfil
       const safePart = sanitizeName(selectedReport.part || 'Khong_Bo_Vi');
       const safeSubPart = selectedReport.subPart ? sanitizeName(selectedReport.subPart) : '';
       const safeOrder = sanitizeName(selectedReport.order);
+      const safeModel = selectedReport.shoeModel ? sanitizeName(selectedReport.shoeModel) : '';
       const safeColor = sanitizeName(selectedReport.colorCode);
       const safeError = sanitizeName(selectedReport.errorName);
       const safeSupplier = sanitizeName(selectedReport.supplier);
       const safeFloor = sanitizeName(selectedReport.floor);
       const partPrefix = safeSubPart ? `${safePart}_${safeSubPart}` : safePart;
-      const namePrefix = `${partPrefix}_${safeOrder}_${safeColor}_${safeError}_${safeSupplier}_${safeFloor}`;
+      const modelPrefix = safeModel ? `${safeModel}_` : '';
+      const namePrefix = `${partPrefix}_${safeOrder}_${modelPrefix}${safeColor}_${safeError}_${safeSupplier}_${safeFloor}`;
 
       await downloadImageUrls(selectedReport.imageUrls, namePrefix);
     } catch (e: any) {
@@ -1097,7 +1111,8 @@ export const QCHistory = React.memo(function QCHistory({ user, token, userProfil
         r.supplier.toLowerCase().includes(q) ||
         r.floor.toLowerCase().includes(q) ||
         (r.part && r.part.toLowerCase().includes(q)) ||
-        (r.subPart && r.subPart.toLowerCase().includes(q))
+        (r.subPart && r.subPart.toLowerCase().includes(q)) ||
+        (r.shoeModel && r.shoeModel.toLowerCase().includes(q))
       );
     }
 
@@ -1168,27 +1183,29 @@ export const QCHistory = React.memo(function QCHistory({ user, token, userProfil
   };
 
   return (
-    <div className="flex-1 min-h-0 h-auto md:h-full flex flex-col max-w-[1600px] w-full mx-auto p-3 sm:p-4 lg:p-6 overflow-visible md:overflow-hidden lg:flex-row lg:gap-6">
+    <div className="flex-1 min-h-0 h-auto md:h-full flex flex-col max-w-[1600px] w-full mx-auto p-3 sm:p-4 lg:p-6 overflow-visible md:overflow-hidden lg:flex-row lg:gap-5">
       
-      {/* Left Column (Desktop 2/3) */}
-      <div className={`flex-1 flex-col min-w-0 min-h-0 h-auto md:h-full ${selectedReport ? 'hidden lg:flex lg:w-2/3 lg:flex-none' : 'flex w-full'}`}>
-        {/* COMPACT TOOLBAR */}
-        <div className="bg-white rounded-2xl border border-slate-100/80 shadow-[0_2px_12px_-4px_rgba(0,0,0,0.06)] shadow-sm p-2 sm:p-3 mb-3 shrink-0 flex flex-col gap-2.5">
+      {/* Left Column (Desktop Master Pane) */}
+      <div className={`flex-1 flex-col min-w-0 min-h-0 h-auto md:h-full ${selectedReport ? 'hidden lg:flex lg:w-3/5 lg:flex-none' : 'flex w-full'}`}>
+        {/* COMPACT INDUSTRIAL TOOLBAR */}
+        <div className="bg-white rounded-lg border border-slate-200 shadow-xs p-3 sm:p-4 mb-3 shrink-0 flex flex-col gap-3">
           {/* ROW 1: Stats & Filters */}
-          <div className="flex flex-col xl:flex-row gap-2.5 items-start xl:items-center justify-between">
-            {/* Stats (Compact) */}
-            <div className="flex items-center flex-wrap gap-2 text-[11px] font-semibold w-full xl:w-auto">
-              <div className="flex items-center gap-1.5 bg-[#F8FAFC] border border-slate-100 px-2.5 py-1.5 rounded-lg flex-1 sm:flex-none justify-center">
-                <span className="text-slate-500 uppercase tracking-wider text-[9px]">Tổng:</span>
-                <span className="text-slate-800 text-sm">{reports.length}</span>
+          <div className="flex flex-col xl:flex-row gap-3 items-start xl:items-center justify-between">
+            {/* Stats (Compact Industrial) */}
+            <div className="flex items-center flex-wrap gap-2 text-xs font-mono font-semibold w-full xl:w-auto">
+              <div className="flex items-center gap-1.5 bg-slate-50 border border-slate-200 px-2.5 py-1.5 rounded flex-1 sm:flex-none justify-center">
+                <span className="text-slate-500 uppercase tracking-wider text-[10px]">TỔNG:</span>
+                <span className="text-slate-900 font-bold">{reports.length}</span>
               </div>
-              <div className="flex items-center gap-1.5 bg-emerald-50 border border-emerald-100 px-2.5 py-1.5 rounded-lg flex-1 sm:flex-none justify-center">
-                <span className="text-emerald-600/70 uppercase tracking-wider text-[9px]">Đồng bộ:</span>
-                <span className="text-emerald-700 text-sm">{reports.filter(r => !r.isLocalOnly).length}</span>
+              <div className="flex items-center gap-1.5 bg-emerald-50 border border-emerald-200 px-2.5 py-1.5 rounded flex-1 sm:flex-none justify-center">
+                <span className="w-1.5 h-1.5 rounded-full bg-emerald-600"></span>
+                <span className="text-emerald-700 uppercase tracking-wider text-[10px]">ONLINE:</span>
+                <span className="text-emerald-800 font-bold">{reports.filter(r => !r.isLocalOnly).length}</span>
               </div>
-              <div className="flex items-center gap-1.5 bg-amber-50 border border-amber-100 px-2.5 py-1.5 rounded-lg flex-1 sm:flex-none justify-center">
-                <span className="text-amber-600/70 uppercase tracking-wider text-[9px]">Lưu tạm:</span>
-                <span className="text-amber-600 text-sm">{reports.filter(r => r.isLocalOnly).length}</span>
+              <div className="flex items-center gap-1.5 bg-amber-50 border border-amber-200 px-2.5 py-1.5 rounded flex-1 sm:flex-none justify-center">
+                <span className="w-1.5 h-1.5 rounded-full bg-amber-600"></span>
+                <span className="text-amber-700 uppercase tracking-wider text-[10px]">TẠM LƯU:</span>
+                <span className="text-amber-800 font-bold">{reports.filter(r => r.isLocalOnly).length}</span>
               </div>
             </div>
 
@@ -1197,7 +1214,7 @@ export const QCHistory = React.memo(function QCHistory({ user, token, userProfil
               <select
                 value={selectedFloor}
                 onChange={e => setSelectedFloor(e.target.value)}
-                className="h-[30px] px-2 border border-slate-100 rounded-md text-[11px] bg-[#F8FAFC] outline-none focus:ring-1 focus:ring-blue-500 font-medium text-slate-700 flex-1 min-w-[110px]"
+                className="h-9 px-2.5 border border-slate-300 rounded text-xs bg-white outline-none focus:ring-1 focus:ring-blue-600 focus:border-blue-600 font-medium text-slate-800 flex-1 min-w-[110px]"
               >
                 <option value="all">Tất cả khu vực</option>
                 {uniqueFloors.map(floor => (
@@ -1208,7 +1225,7 @@ export const QCHistory = React.memo(function QCHistory({ user, token, userProfil
               <select
                 value={selectedSupplier}
                 onChange={e => setSelectedSupplier(e.target.value)}
-                className="h-[30px] px-2 border border-slate-100 rounded-md text-[11px] bg-[#F8FAFC] outline-none focus:ring-1 focus:ring-blue-500 font-medium text-slate-700 flex-1 min-w-[110px]"
+                className="h-9 px-2.5 border border-slate-300 rounded text-xs bg-white outline-none focus:ring-1 focus:ring-blue-600 focus:border-blue-600 font-medium text-slate-800 flex-1 min-w-[110px]"
               >
                 <option value="all">Tất cả xưởng</option>
                 {uniqueSuppliers.map(sup => (
@@ -1220,7 +1237,7 @@ export const QCHistory = React.memo(function QCHistory({ user, token, userProfil
                 <select
                   value={selectedPart}
                   onChange={e => setSelectedPart(e.target.value)}
-                  className="h-[30px] px-2 border border-slate-100 rounded-md text-[11px] bg-[#F8FAFC] outline-none focus:ring-1 focus:ring-blue-500 font-medium text-slate-700 flex-1 min-w-[110px]"
+                  className="h-9 px-2.5 border border-slate-300 rounded text-xs bg-white outline-none focus:ring-1 focus:ring-blue-600 focus:border-blue-600 font-medium text-slate-800 flex-1 min-w-[110px]"
                 >
                   <option value="all">Tất cả bộ vị</option>
                   {uniqueParts.map(p => (
@@ -1232,45 +1249,45 @@ export const QCHistory = React.memo(function QCHistory({ user, token, userProfil
               <select
                 value={selectedStatus}
                 onChange={e => setSelectedStatus(e.target.value)}
-                className="h-[30px] px-2 border border-slate-100 rounded-md text-[11px] bg-[#F8FAFC] outline-none focus:ring-1 focus:ring-blue-500 font-medium text-slate-700 flex-1 min-w-[110px]"
+                className="h-9 px-2.5 border border-slate-300 rounded text-xs bg-white outline-none focus:ring-1 focus:ring-blue-600 focus:border-blue-600 font-medium text-slate-800 flex-1 min-w-[110px]"
               >
                 <option value="all">Tất cả trạng thái</option>
-                <option value="synced">Đã đồng bộ mây</option>
-                <option value="offline">Lưu tạm offline</option>
+                <option value="synced">Đã đồng bộ Cloud</option>
+                <option value="offline">Lưu tạm ngoại tuyến</option>
               </select>
 
-              <div className="flex items-center gap-1 h-[30px] bg-[#F8FAFC] border border-slate-100 rounded-md px-2 flex-1 min-w-[180px]">
-                <Calendar className="h-3 w-3 text-slate-400 shrink-0" />
+              <div className="flex items-center gap-1.5 h-9 bg-white border border-slate-300 rounded px-2.5 flex-1 min-w-[200px]">
+                <Calendar className="h-3.5 w-3.5 text-slate-400 shrink-0" />
                 <input 
                   type="date" 
                   value={selectedDate}
                   onChange={e => setSelectedDate(e.target.value)}
-                  className="bg-transparent text-[11px] outline-none w-full min-w-0 font-medium text-slate-700"
+                  className="bg-transparent text-xs outline-none w-full min-w-0 font-mono text-slate-800"
                 />
-                <span className="text-slate-300 text-[10px] shrink-0">~</span>
+                <span className="text-slate-400 text-xs shrink-0 font-mono">~</span>
                 <input 
                   type="date" 
                   value={selectedEndDate}
                   onChange={e => setSelectedEndDate(e.target.value)}
-                  className="bg-transparent text-[11px] outline-none w-full min-w-0 font-medium text-slate-700"
+                  className="bg-transparent text-xs outline-none w-full min-w-0 font-mono text-slate-800"
                 />
               </div>
             </div>
           </div>
 
-          <div className="h-px bg-slate-100 w-full"></div>
+          <div className="h-px bg-slate-200 w-full"></div>
 
           {/* ROW 2: Search & Actions */}
           <div className="flex flex-col sm:flex-row gap-2.5 items-start sm:items-center justify-between">
             {/* Search */}
-            <div className="relative w-full sm:w-[280px]">
-              <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-slate-400" />
+            <div className="relative w-full sm:w-[320px]">
+              <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
               <input 
                 type="text" 
-                placeholder="Tìm kiếm nhanh mã đơn, lỗi..." 
+                placeholder="Tìm kiếm mã PO, loại lỗi, mã màu..." 
                 value={searchQuery}
                 onChange={e => setSearchQuery(e.target.value)}
-                className="w-full pl-8 pr-2 h-[30px] border border-slate-100 rounded-md text-[11px] bg-[#F8FAFC] focus:ring-1 focus:ring-blue-500 outline-none font-medium text-slate-700"
+                className="w-full pl-9 pr-3 h-9 border border-slate-300 rounded text-xs bg-white focus:ring-1 focus:ring-blue-600 focus:border-blue-600 outline-none font-medium text-slate-800 placeholder:text-slate-400"
               />
             </div>
 
@@ -1278,11 +1295,11 @@ export const QCHistory = React.memo(function QCHistory({ user, token, userProfil
             <div className="flex items-center flex-wrap gap-2 w-full sm:w-auto justify-end">
               <button
                 onClick={toggleSortOrder}
-                className="text-[11px] flex items-center justify-center gap-1 text-slate-600 hover:text-slate-800 font-medium bg-[#F8FAFC] hover:bg-slate-100 border border-slate-100 px-2 h-[30px] rounded-md transition-all"
+                className="h-9 px-3 text-xs font-mono font-bold flex items-center justify-center gap-1.5 text-slate-700 bg-slate-100 hover:bg-slate-200 border border-slate-300 rounded transition-colors cursor-pointer"
                 title="Sắp xếp theo thời gian"
               >
-                <ArrowUpDown className="h-3 w-3" />
-                {sortOrder === 'desc' ? 'Mới nhất' : 'Cũ nhất'}
+                <ArrowUpDown className="h-3.5 w-3.5" />
+                <span>{sortOrder === 'desc' ? 'MỚI NHẤT' : 'CŨ NHẤT'}</span>
               </button>
               
               {isAdmin && (
@@ -1290,20 +1307,20 @@ export const QCHistory = React.memo(function QCHistory({ user, token, userProfil
                   <button
                     onClick={handleExportToExcel}
                     disabled={isLoading || filteredReports.length === 0}
-                    className="text-[11px] flex items-center justify-center gap-1 text-green-700 hover:text-green-800 font-medium bg-green-50 hover:bg-green-100 border border-green-200 px-2 h-[30px] rounded-md transition-all disabled:opacity-50"
+                    className="h-9 px-3 text-xs font-mono font-bold flex items-center justify-center gap-1.5 text-emerald-800 bg-emerald-50 hover:bg-emerald-100 border border-emerald-300 rounded transition-colors disabled:opacity-50 cursor-pointer"
                   >
-                    <Download className="h-3 w-3" />
-                    <span className="hidden sm:inline">Excel</span>
+                    <Download className="h-3.5 w-3.5" />
+                    <span className="hidden sm:inline">XUẤT EXCEL</span>
                   </button>
                   
                   <button
                     onClick={handleDownloadBulkZIP}
                     disabled={isLoading || filteredReports.length === 0}
-                    className="text-[11px] flex items-center justify-center gap-1 text-amber-700 hover:text-amber-800 font-medium bg-amber-50 hover:bg-amber-100 border border-amber-200 px-2 h-[30px] rounded-md transition-all disabled:opacity-50"
-                    title="Tải ảnh ZIP"
+                    className="h-9 px-3 text-xs font-mono font-bold flex items-center justify-center gap-1.5 text-amber-800 bg-amber-50 hover:bg-amber-100 border border-amber-300 rounded transition-colors disabled:opacity-50 cursor-pointer"
+                    title="Tải trọn bộ ảnh dạng tệp nén ZIP"
                   >
-                    <Download className="h-3 w-3" />
-                    <span className="hidden sm:inline">Ảnh ZIP</span>
+                    <Download className="h-3.5 w-3.5" />
+                    <span className="hidden sm:inline">TẢI ZIP ẢNH</span>
                   </button>
                 </>
               )}
@@ -1311,10 +1328,10 @@ export const QCHistory = React.memo(function QCHistory({ user, token, userProfil
               <button
                 onClick={() => fetchReports(true)}
                 disabled={isLoading}
-                className="text-[11px] flex items-center justify-center gap-1 text-blue-700 hover:text-blue-800 font-medium bg-blue-50 hover:bg-blue-100 border border-blue-200 px-2 h-[30px] rounded-md transition-all disabled:opacity-50"
+                className="h-9 px-3 text-xs font-mono font-bold flex items-center justify-center gap-1.5 text-blue-700 bg-blue-50 hover:bg-blue-100 border border-blue-300 rounded transition-colors disabled:opacity-50 cursor-pointer"
               >
-                <RefreshCw className={`h-3 w-3 ${isLoading ? 'animate-spin' : ''}`} />
-                <span className="hidden sm:inline">Làm mới</span>
+                <RefreshCw className={`h-3.5 w-3.5 ${isLoading ? 'animate-spin' : ''}`} />
+                <span className="hidden sm:inline">LÀM MỚI</span>
               </button>
             </div>
           </div>
@@ -1322,45 +1339,44 @@ export const QCHistory = React.memo(function QCHistory({ user, token, userProfil
 
       {/* Sync Status Banner */}
       {(syncStatusMsg || reports.some(r => r.isLocalOnly)) && (
-        <div className="bg-amber-50 border border-amber-200 py-2.5 px-4 rounded-lg mb-4 flex flex-wrap items-center justify-between gap-3 shrink-0">
-          <div className="flex items-center gap-2 text-amber-800 text-xs">
-            <Info className={`h-4 w-4 text-amber-500 shrink-0 ${syncStatusMsg ? 'animate-pulse' : ''}`} />
-            <span className={`font-semibold ${syncStatusMsg ? 'animate-pulse' : ''}`}>
-               {syncStatusMsg || `Có ${reports.filter(r => r.isLocalOnly).length} báo cáo đang lưu tạm ngoại tuyến trên máy này. Để tránh mất dữ liệu khi chuyển sang máy khác, hãy nhấn ĐỒNG BỘ LÊN CLOUD ngay!`}
+        <div className="bg-amber-50 border border-amber-300 p-3 rounded-lg mb-3 flex flex-wrap items-center justify-between gap-3 shrink-0">
+          <div className="flex items-center gap-2 text-amber-900 text-xs">
+            <Info className={`h-4 w-4 text-amber-600 shrink-0 ${syncStatusMsg ? 'animate-pulse' : ''}`} />
+            <span className="font-semibold">
+               {syncStatusMsg || `Có ${reports.filter(r => r.isLocalOnly).length} báo cáo đang lưu tạm ngoại tuyến trên máy này. Hãy bấm ĐỒNG BỘ để tải lên máy chủ.`}
             </span>
           </div>
           {!syncStatusMsg && (
              <button
                 onClick={handleSyncAllLocal}
-                className="bg-amber-500 hover:bg-amber-600 text-white font-bold text-xs py-1.5 px-3 rounded-lg flex flex-shrink-0 items-center justify-center gap-1.5 cursor-pointer shadow-sm transition-colors border-none"
+                className="bg-amber-600 hover:bg-amber-700 text-white font-mono font-bold text-xs py-1.5 px-3 rounded flex items-center gap-1.5 cursor-pointer border-none shadow-xs"
              >
                 <RefreshCw className="h-3.5 w-3.5" />
-                Đồng bộ tất cả lên Cloud (Nhanh)
+                ĐỒNG BỘ LÊN CLOUD
              </button>
           )}
         </div>
       )}
 
-
       {/* Reports List */}
-      <div className={`flex-1 min-h-0 h-auto md:overflow-y-auto pr-1 flex flex-col gap-3 pb-6 ${selectedReport ? 'hidden lg:flex' : 'flex'}`}>
+      <div className={`flex-1 min-h-0 h-auto md:overflow-y-auto pr-1 flex flex-col gap-2.5 pb-6 ${selectedReport ? 'hidden lg:flex' : 'flex'}`}>
           {isLoading ? (
-            <div className="flex-1 flex flex-col items-center justify-center py-20 bg-white rounded-2xl border border-slate-100/80 shadow-[0_2px_12px_-4px_rgba(0,0,0,0.06)]">
+            <div className="flex-1 flex flex-col items-center justify-center py-20 bg-white rounded-lg border border-slate-200 shadow-xs">
               <RefreshCw className="animate-spin h-8 w-8 text-blue-600 mb-3" />
-              <p className="text-sm font-medium text-slate-500">Đang quét tìm báo cáo lưu trữ...</p>
+              <p className="text-xs font-mono font-medium text-slate-500">ĐANG TẢI DỮ LIỆU BÁO CÁO...</p>
             </div>
           ) : filteredReports.length === 0 ? (
-            <div className="flex-1 flex flex-col items-center justify-center py-16 bg-white rounded-2xl border border-slate-100/80 shadow-[0_2px_12px_-4px_rgba(0,0,0,0.06)] text-center px-4">
-              <FileText className="h-12 w-12 text-slate-300 mb-2.5" />
-              <p className="text-base font-bold text-slate-600">Không tìm thấy báo cáo nào</p>
-              <p className="text-xs text-slate-400 max-w-sm mt-1">
-                Hãy thử nới lỏng từ khóa hoặc bộ lọc tìm kiếm của bạn, hoặc tạo một báo cáo lỗi mới ngay hôm nay.
+            <div className="flex-1 flex flex-col items-center justify-center py-16 bg-white rounded-lg border border-slate-200 shadow-xs text-center px-4">
+              <FileText className="h-10 w-10 text-slate-300 mb-2" />
+              <p className="text-sm font-bold text-slate-700 font-mono uppercase">Không tìm thấy báo cáo nào phù hợp</p>
+              <p className="text-xs text-slate-500 max-w-sm mt-1">
+                Thử điều chỉnh lại bộ lọc ngày hoặc từ khóa tìm kiếm.
               </p>
               <button 
                 onClick={onNavigateToCreate}
-                className="mt-4 bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs py-2 px-4 rounded-lg cursor-pointer border-none"
+                className="mt-4 bg-blue-600 hover:bg-blue-700 text-white font-mono font-bold text-xs py-2 px-4 rounded cursor-pointer border-none"
               >
-                Tạo Báo Cáo Mới
+                + TẠO BÁO CÁO MỚI
               </button>
             </div>
           ) : (
@@ -1372,10 +1388,10 @@ export const QCHistory = React.memo(function QCHistory({ user, token, userProfil
                   setActiveDetailImageIndex(0);
                   setLoadedImageUrls({});
                 }}
-                className={`shrink-0 group border rounded-xl overflow-hidden shadow-sm transition-all p-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 cursor-pointer bg-white ${selectedReport?.id === report.id ? 'border-blue-500 ring-2 ring-blue-500/20' : 'border-slate-100 hover:border-blue-200 hover:shadow-md'}`}
+                className={`shrink-0 border rounded-lg p-3 sm:p-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 cursor-pointer bg-white transition-all shadow-xs ${selectedReport?.id === report.id ? 'border-blue-600 ring-1 ring-blue-600 bg-blue-50/15' : 'border-slate-200 hover:border-slate-400'}`}
               >
-                <div className="flex-1 flex items-start gap-3.5">
-                  <div className="h-12 w-12 rounded-lg bg-slate-100 border border-slate-100 overflow-hidden flex items-center justify-center text-slate-500 group-hover:bg-blue-50 group-hover:text-blue-600 transition-all shrink-0 relative shadow-sm">
+                <div className="flex-1 flex items-start gap-3 min-w-0">
+                  <div className="h-14 w-14 rounded bg-slate-900 border border-slate-200 overflow-hidden flex items-center justify-center text-slate-400 shrink-0 relative">
                     {report.imageUrls && report.imageUrls.length > 0 ? (
                       <DriveImage 
                         url={report.imageUrls[0]} 
@@ -1389,65 +1405,68 @@ export const QCHistory = React.memo(function QCHistory({ user, token, userProfil
                   </div>
                   <div className="flex-1 min-w-0">
                     <div className="flex flex-col gap-1.5 min-w-0">
-                      <h3 className="text-base font-extrabold text-slate-800 leading-tight">
-                        {report.errorName || 'Chưa phân loại lỗi'}
-                      </h3>
-                      
-                      <div className="flex flex-wrap items-center gap-2">
-                        <span className="text-xs font-bold text-purple-700 bg-purple-50 px-2 py-0.5 rounded border border-purple-100 truncate max-w-[120px]">
-                          {report.part || 'Khong_Bo_Vi'}
-                        </span>
-                        {report.subPart && (
-                          <span className="text-xs font-bold text-indigo-700 bg-indigo-50 px-2 py-0.5 rounded border border-indigo-100 truncate max-w-[140px]">
-                            {report.subPart}
-                          </span>
-                        )}
-                        {isAdmin && report.downloadedBy && report.downloadedBy.includes(user.email || '') && (
-                          <span className="text-[10px] font-bold text-slate-600 bg-slate-200 px-1.5 py-0.5 rounded-full border border-slate-300 flex items-center gap-1">
-                             <CheckCircle className="h-3 w-3" /> Đã tải
-                          </span>
-                        )}
-                        <span className="text-xs font-bold font-mono text-slate-600 bg-slate-100/80 px-2 py-0.5 rounded border border-slate-100/60">
-                          PO: {report.order || 'N/A'}
-                        </span>
-                        <span className="text-xs font-bold font-mono text-blue-700 bg-blue-50 px-2 py-0.5 rounded border border-blue-100">
-                          Màu: {report.colorCode || 'N/A'}
-                        </span>
-                        
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <h3 className="text-sm font-bold text-slate-900 leading-tight">
+                          {report.errorName || 'Chưa phân loại lỗi'}
+                        </h3>
                         {report.isLocalOnly ? (
-                          <span className="text-[10px] font-bold text-amber-600 bg-amber-50 px-1.5 py-0.5 rounded-full border border-amber-200 flex items-center gap-1">
-                            <CloudOff className="h-3 w-3" /> Nháp
+                          <span className="text-[10px] font-mono font-bold text-amber-700 bg-amber-50 px-1.5 py-0.5 rounded border border-amber-200 flex items-center gap-1">
+                            <CloudOff className="h-3 w-3" /> LƯU TẠM
                           </span>
                         ) : (
-                          <span className="text-[10px] font-bold text-emerald-600 bg-emerald-50 px-1.5 py-0.5 rounded-full border border-emerald-100 flex items-center gap-1">
-                            <CheckCircle className="h-3 w-3" /> Đã lưu
-                          </span>
-                        )}
-
-                        {isAdmin && report.employeeId && (
-                          <span className="text-[10px] font-bold text-slate-600 bg-slate-100 border border-slate-100 px-1.5 py-0.5 rounded-full">
-                            QC: {report.employeeId}
+                          <span className="text-[10px] font-mono font-bold text-emerald-700 bg-emerald-50 px-1.5 py-0.5 rounded border border-emerald-200 flex items-center gap-1">
+                            <CheckCircle className="h-3 w-3" /> ONLINE
                           </span>
                         )}
                       </div>
                       
-                      <div className="flex flex-wrap gap-x-3 gap-y-1.5 text-xs text-slate-600 font-medium">
-                        <span className="flex items-center gap-1.5 bg-[#F8FAFC] px-1.5 rounded pr-2 border border-slate-100/50">
-                          <MapPin className="h-3.5 w-3.5 text-slate-400" /> {report.floor || 'N/A'}
+                      <div className="flex flex-wrap items-center gap-1.5 font-mono text-xs">
+                        <span className="font-semibold text-slate-700 bg-slate-100 px-2 py-0.5 rounded border border-slate-200">
+                          {report.part || 'Chưa chọn'}
                         </span>
-                        <span className="flex items-center gap-1.5 bg-[#F8FAFC] px-1.5 rounded pr-2 border border-slate-100/50">
-                          <Factory className="h-3.5 w-3.5 text-slate-400" /> {report.supplier || 'N/A'}
+                        {report.subPart && (
+                          <span className="font-semibold text-blue-800 bg-blue-50 px-2 py-0.5 rounded border border-blue-200">
+                            {report.subPart}
+                          </span>
+                        )}
+                        <span className="font-bold text-slate-800 bg-slate-100 px-2 py-0.5 rounded border border-slate-200">
+                          PO: {report.order || 'N/A'}
                         </span>
-                        <span className="flex items-center gap-1.5 bg-[#F8FAFC] px-1.5 rounded pr-2 border border-slate-100/50">
-                          <Calendar className="h-3.5 w-3.5 text-slate-400" /> {getFriendlyDate(report.date) || 'N/A'}
+                        {report.shoeModel && (
+                          <span className="font-bold text-teal-800 bg-teal-50 px-2 py-0.5 rounded border border-teal-200">
+                            HT: {report.shoeModel}
+                          </span>
+                        )}
+                        {report.colorCode && (
+                          <span className="font-bold text-indigo-800 bg-indigo-50 px-2 py-0.5 rounded border border-indigo-200">
+                            MÀU: {report.colorCode}
+                          </span>
+                        )}
+                      </div>
+                      
+                      <div className="flex flex-wrap gap-x-3 gap-y-1 text-xs text-slate-500 font-mono">
+                        <span className="flex items-center gap-1">
+                          <MapPin className="h-3 w-3 text-slate-400" /> {report.floor || 'N/A'}
                         </span>
+                        <span className="flex items-center gap-1">
+                          <Factory className="h-3 w-3 text-slate-400" /> {report.supplier || 'N/A'}
+                        </span>
+                        <span className="flex items-center gap-1">
+                          <Calendar className="h-3 w-3 text-slate-400" /> {getFriendlyDate(report.date) || 'N/A'}
+                        </span>
+                        {(report.employeeName || report.employeeId) && (
+                          <span className="flex items-center gap-1 text-slate-700 font-semibold" title={`QC: ${report.employeeName || ''} (${report.employeeId || ''})`}>
+                            <UserIcon className="h-3 w-3 text-slate-400" />
+                            <span className="break-words">{report.employeeName || report.employeeId}</span>
+                          </span>
+                        )}
                       </div>
                     </div>
                   </div>
                 </div>
 
                 <div className="flex items-center gap-3 w-full sm:w-auto shrink-0 border-t sm:border-t-0 pt-2 sm:pt-0 justify-between sm:justify-end">
-                  <div className="text-[11px] text-slate-400 flex items-center gap-1">
+                  <div className="text-[11px] font-mono text-slate-400 flex items-center gap-1">
                     <Clock className="h-3 w-3" />
                     {report.createdAt ? format(new Date(report.createdAt), 'HH:mm') : ''}
                   </div>
@@ -1460,14 +1479,14 @@ export const QCHistory = React.memo(function QCHistory({ user, token, userProfil
                           handleSyncReport(report);
                         }}
                         disabled={syncingId === report.id}
-                        className="bg-amber-500 hover:bg-amber-600 disabled:bg-amber-300 text-white text-xs font-bold py-1.5 px-3 rounded-lg flex items-center gap-1 relative cursor-pointer border-none"
+                        className="bg-amber-600 hover:bg-amber-700 disabled:bg-amber-400 text-white text-xs font-mono font-bold py-1 px-2.5 rounded flex items-center gap-1 cursor-pointer border-none"
                         title="Đồng bộ thủ công"
                       >
                         <RefreshCw className={`h-3 w-3 ${syncingId === report.id ? 'animate-spin' : ''}`} />
                         Đồng bộ
                       </button>
                     )}
-                    <ChevronRight className="h-5 w-5 text-slate-300 group-hover:text-blue-500 transition-colors hidden sm:block" />
+                    <ChevronRight className="h-4 w-4 text-slate-400 hidden sm:block" />
                   </div>
                 </div>
               </div>
@@ -1476,30 +1495,30 @@ export const QCHistory = React.memo(function QCHistory({ user, token, userProfil
         </div>
       </div>
 
-      {/* Right Column (Desktop 1/3) */}
-      <div className={`w-full lg:w-1/3 min-h-0 lg:min-w-[420px] lg:max-w-[480px] flex-col h-auto md:h-full lg:gap-5 ${selectedReport ? 'flex' : 'hidden'}`}>
+      {/* Right Column (Desktop Detail Pane) */}
+      <div className={`w-full lg:w-2/5 min-h-0 lg:min-w-[420px] flex-col h-auto md:h-full ${selectedReport ? 'flex' : 'hidden'}`}>
         
         {/* Selected Details Drawer Pane */}
-        <div className={`bg-white rounded-2xl border border-slate-100/80 shadow-[0_2px_12px_-4px_rgba(0,0,0,0.06)] shadow-sm flex flex-col lg:overflow-hidden flex-1 h-auto lg:h-full lg:min-h-0 ${selectedReport ? 'flex' : 'hidden'}`}>
+        <div className={`bg-white rounded-lg border border-slate-200 shadow-xs flex flex-col lg:overflow-hidden flex-1 h-auto lg:h-full lg:min-h-0 ${selectedReport ? 'flex' : 'hidden'}`}>
           {selectedReport ? (
             <div className="flex-1 flex flex-col h-auto lg:h-full lg:overflow-y-auto">
               {/* Header Title */}
-              <div className="p-4 bg-white border-b border-slate-100 text-slate-800 shrink-0 flex items-center justify-between">
+              <div className="p-3.5 bg-slate-900 border-b border-slate-800 text-white shrink-0 flex items-center justify-between">
                 <div>
-                  <div className="text-[10px] text-slate-500 font-bold uppercase tracking-widest flex items-center gap-1 mb-0.5">
+                  <div className="text-[10px] text-slate-400 font-mono uppercase tracking-wider flex items-center gap-1.5 mb-0.5">
                     {selectedReport.isLocalOnly ? (
-                      <span className="text-amber-600 flex items-center gap-1"><CloudOff className="h-3 w-3" /> BÁO CÁO LƯU TẠM</span>
+                      <span className="text-amber-400 flex items-center gap-1"><CloudOff className="h-3 w-3" /> BÁO CÁO LƯU TẠM</span>
                     ) : (
-                      <span className="text-emerald-600 flex items-center gap-1"><CheckCircle className="h-3 w-3" /> ĐÃ LƯU TRÊN MÂY</span>
+                      <span className="text-emerald-400 flex items-center gap-1"><CheckCircle className="h-3 w-3" /> ĐÃ LƯU TRỰC TUYẾN</span>
                     )}
                   </div>
-                  <h3 className="text-sm font-extrabold line-clamp-1 leading-tight">{selectedReport.errorName}</h3>
+                  <h3 className="text-sm font-bold truncate leading-tight font-mono">{selectedReport.errorName}</h3>
                 </div>
                 <button 
                   onClick={() => setSelectedReport(null)}
-                  className="px-2.5 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 hover:text-slate-900 rounded-lg text-xs font-extrabold cursor-pointer border-none flex items-center gap-1 shrink-0 transition-colors"
+                  className="px-2.5 py-1 bg-slate-800 hover:bg-slate-700 text-slate-200 rounded text-xs font-mono font-bold cursor-pointer border border-slate-700 flex items-center gap-1 shrink-0 transition-colors"
                 >
-                  ‹ Quay lại
+                  ‹ QUAY LẠI
                 </button>
               </div>
 
@@ -1665,6 +1684,19 @@ export const QCHistory = React.memo(function QCHistory({ user, token, userProfil
 
                     <div className="flex flex-col gap-1.5">
                       <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider flex items-center gap-1 font-mono">
+                        <Tag className="h-3 w-3 text-slate-400" /> Hình Thể
+                      </label>
+                      <input 
+                        type="text"
+                        value={editShoeModel}
+                        onChange={e => setEditShoeModel(e.target.value.toUpperCase())}
+                        className="w-full p-2 border border-slate-100 rounded-lg text-sm bg-white font-mono focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition-all font-bold text-slate-800 uppercase"
+                        placeholder="Nhập hình thể..."
+                      />
+                    </div>
+
+                    <div className="flex flex-col gap-1.5">
+                      <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider flex items-center gap-1 font-mono">
                         <Layers className="h-3 w-3 text-slate-400" /> Mã Màu
                       </label>
                       <input 
@@ -1740,55 +1772,75 @@ export const QCHistory = React.memo(function QCHistory({ user, token, userProfil
                 ) : (
                   /* VIEW MODE */
                   <>
-                    {/* Visual Metadata Fields Grid */}
-                    <div className="grid grid-cols-2 bg-[#F8FAFC] border border-slate-100 rounded-xl overflow-hidden divide-y divide-slate-100">
-                      <div className="flex divide-x divide-slate-100 col-span-2">
-                        <div className="p-3 flex-1 flex items-center justify-center text-center">
-                          <span className="text-sm font-bold text-slate-700">{getFriendlyDate(selectedReport.date)}</span>
+                    {/* Industrial Metadata Specifications Grid */}
+                    <div className="grid grid-cols-2 bg-slate-50 border border-slate-200 rounded overflow-hidden divide-y divide-slate-200 font-mono text-xs">
+                      <div className="flex divide-x divide-slate-200 col-span-2">
+                        <div className="p-2.5 flex-1 flex flex-col items-center justify-center text-center">
+                          <span className="text-[10px] text-slate-400 uppercase tracking-wider">NGÀY KIỂM</span>
+                          <span className="font-bold text-slate-800">{getFriendlyDate(selectedReport.date)}</span>
                         </div>
-                        <div className="p-3 flex-1 flex items-center justify-center text-center">
-                          <span className="text-sm font-bold text-slate-700">{selectedReport.floor}</span>
+                        <div className="p-2.5 flex-1 flex flex-col items-center justify-center text-center">
+                          <span className="text-[10px] text-slate-400 uppercase tracking-wider">KHU VỰC / LẦU</span>
+                          <span className="font-bold text-slate-800">{selectedReport.floor}</span>
                         </div>
                       </div>
                       
-                      <div className="flex divide-x divide-slate-100 col-span-2">
-                        <div className="p-3 flex-1 flex flex-col items-center justify-center text-center">
-                          <span className="text-sm font-bold text-slate-700">{selectedReport.part || 'Không xác định'}</span>
+                      <div className="flex divide-x divide-slate-200 col-span-2">
+                        <div className="p-2.5 flex-1 flex flex-col items-center justify-center text-center">
+                          <span className="text-[10px] text-slate-400 uppercase tracking-wider">BỘ VỊ & THÀNH PHẦN</span>
+                          <span className="font-bold text-slate-800">{selectedReport.part || 'Không xác định'}</span>
                           {selectedReport.subPart && (
-                            <span className="text-xs font-semibold text-indigo-600 mt-0.5">({selectedReport.subPart})</span>
+                            <span className="text-[11px] font-semibold text-blue-700 mt-0.5 font-sans">({selectedReport.subPart})</span>
                           )}
                         </div>
-                        <div className="p-3 flex-1 flex items-center justify-center text-center">
-                          <span className="text-sm font-bold text-slate-800 font-mono tracking-wide">{selectedReport.order}</span>
+                        <div className="p-2.5 flex-1 flex flex-col items-center justify-center text-center">
+                          <span className="text-[10px] text-slate-400 uppercase tracking-wider">ĐƠN HÀNG (PO)</span>
+                          <span className="font-bold text-slate-900 font-mono tracking-wide">{selectedReport.order}</span>
                         </div>
                       </div>
 
-                      <div className="p-3 col-span-2 flex items-center justify-center text-center">
-                        <span className="text-sm font-bold text-slate-700 font-mono">{selectedReport.colorCode}</span>
+                      <div className="flex divide-x divide-slate-200 col-span-2">
+                        {selectedReport.shoeModel && (
+                          <div className="p-2.5 flex-1 flex flex-col items-center justify-center text-center">
+                            <span className="text-[10px] text-slate-400 uppercase tracking-wider">HÌNH THỂ</span>
+                            <span className="font-bold text-teal-800 font-mono">{selectedReport.shoeModel}</span>
+                          </div>
+                        )}
+                        <div className="p-2.5 flex-1 flex flex-col items-center justify-center text-center">
+                          <span className="text-[10px] text-slate-400 uppercase tracking-wider">MÃ MÀU</span>
+                          <span className="font-bold text-indigo-800 font-mono">{selectedReport.colorCode || 'N/A'}</span>
+                        </div>
                       </div>
                     </div>
 
                     {/* Additional Metadata Info */}
-                    <div className="border-t border-slate-100 pt-4 space-y-3 text-sm">
-                      <div className="flex justify-between items-center py-1">
-                        <span className="font-medium text-slate-500">Xưởng cung ứng:</span>
-                        <span className="font-extrabold text-slate-800">{selectedReport.supplier}</span>
+                    <div className="border-t border-slate-200 pt-3 space-y-2 text-xs font-mono">
+                      <div className="flex justify-between items-center py-1 border-b border-slate-100">
+                        <span className="text-slate-500 uppercase">Xưởng Cung Ứng:</span>
+                        <span className="font-bold text-slate-900">{selectedReport.supplier}</span>
                       </div>
-                      <div className="flex justify-between items-center py-1">
-                        <span className="font-medium text-slate-500">Mã nhân viên:</span>
-                        <span className="font-semibold text-slate-700 break-all">{selectedReport.employeeId}</span>
+                      <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center py-1.5 border-b border-slate-100 gap-1">
+                        <span className="text-slate-500 uppercase shrink-0">QC Phụ Trách:</span>
+                        <div className="text-left sm:text-right">
+                          <span className="font-bold text-slate-900 break-words">
+                            {selectedReport.employeeName || selectedReport.employeeEmail || 'N/A'}
+                          </span>
+                          <span className="text-slate-500 font-mono text-[11px] ml-1.5 font-semibold">
+                            (Mã: {selectedReport.employeeId || 'QC'})
+                          </span>
+                        </div>
                       </div>
-                      <div className="flex justify-between items-center py-1">
-                        <span className="font-medium text-slate-500">Thời gian tạo:</span>
-                        <span className="text-xs text-slate-550">
+                      <div className="flex justify-between items-center py-1 border-b border-slate-100">
+                        <span className="text-slate-500 uppercase">Thời Gian Tạo:</span>
+                        <span className="text-slate-600">
                           {selectedReport.createdAt ? format(new Date(selectedReport.createdAt), 'dd/MM/yyyy HH:mm:ss') : 'Ngoại tuyến'}
                         </span>
                       </div>
                       
                       {selectedReport.note && (
-                        <div className="flex flex-col gap-1 py-2 mt-1 border-t border-slate-100">
-                           <span className="font-medium text-slate-500">Ghi chú chi tiết:</span>
-                           <span className="text-sm font-semibold text-slate-700 whitespace-pre-wrap leading-relaxed">{selectedReport.note}</span>
+                        <div className="flex flex-col gap-1 py-2 mt-1 bg-slate-50 p-2.5 rounded border border-slate-200">
+                           <span className="font-bold text-slate-600 uppercase text-[10px]">Ghi chú kiểm tra:</span>
+                           <span className="text-xs text-slate-800 font-sans whitespace-pre-wrap leading-relaxed">{selectedReport.note}</span>
                         </div>
                       )}
                     </div>
@@ -1796,19 +1848,19 @@ export const QCHistory = React.memo(function QCHistory({ user, token, userProfil
                 )}
 
                 {/* Proof Images Carousel / Grid */}
-                <div className="border-t border-slate-100 pt-4">
-                  <div className="flex items-center justify-between mb-2.5">
-                    <h4 className="text-xs font-bold text-slate-400 uppercase tracking-wider flex items-center gap-1.5">
-                      Hình ảnh minh chứng ({selectedReport.imageUrls?.length || 0} ảnh)
+                <div className="border-t border-slate-200 pt-3">
+                  <div className="flex items-center justify-between mb-2">
+                    <h4 className="text-xs font-bold text-slate-700 uppercase tracking-wider font-mono flex items-center gap-1.5">
+                      Minh chứng hình ảnh ({selectedReport.imageUrls?.length || 0} ảnh)
                     </h4>
                     {selectedReport.imageUrls && selectedReport.imageUrls.length > 0 && (
                       <button
                         onClick={handleDownloadAllImages}
-                        className="text-[11px] text-green-600 hover:text-green-800 font-bold flex items-center gap-1 hover:bg-green-50 px-2 py-1 rounded transition-colors cursor-pointer"
+                        className="text-xs text-emerald-700 hover:text-emerald-900 font-bold font-mono flex items-center gap-1 bg-emerald-50 hover:bg-emerald-100 px-2 py-1 rounded border border-emerald-200 transition-colors cursor-pointer"
                         title="Tải về máy tất cả hình ảnh"
                       >
                         <Download className="h-3 w-3" />
-                        <span>Tải tất cả</span>
+                        <span>TẢI TẤT CẢ</span>
                       </button>
                     )}
                   </div>

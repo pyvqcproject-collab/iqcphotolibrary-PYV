@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect, useCallback } from 'react';
+import React, { useState, useRef, useEffect, useCallback, useMemo } from 'react';
 import { User } from 'firebase/auth';
 import { collection, doc, setDoc, getDocs, getDoc, query, serverTimestamp } from 'firebase/firestore';
 import { db } from './lib/firebase';
@@ -24,11 +24,27 @@ import {
   Settings,
   Loader2,
   FileText,
-  Lock
+  Lock,
+  Box,
+  Sparkles,
+  Check,
+  ChevronDown,
+  Filter,
+  Camera,
+  User as UserIcon
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { QCHistory } from './components/QCHistory';
-import { AdminPanel, QCUser, POMapping, sanitizeMap, DEFAULT_SUB_PARTS } from './components/AdminPanel';
+import { 
+  AdminPanel, 
+  QCUser, 
+  POMapping, 
+  sanitizeMap, 
+  DEFAULT_SUB_PARTS,
+  SupplierModelMapping,
+  DEFAULT_SUPPLIER_MODELS,
+  DEFAULT_COLORS_LIST
+} from './components/AdminPanel';
 
 interface ImagePreviewProps {
   file: File;
@@ -109,6 +125,9 @@ export function QCForm({ user, token, onLogout }: QCFormProps) {
   
   // Custom states added for requested enhancements
   const [userProfile, setUserProfile] = useState<QCUser | null>(null);
+  const [currentPart, setCurrentPart] = useState<string>(() => {
+    return localStorage.getItem('qc_current_part') || '';
+  });
   const [poMappings, setPoMappings] = useState<POMapping[]>([]);
   const [floorOption, setFloorOption] = useState('');
   const [supplierOption, setSupplierOption] = useState('');
@@ -117,6 +136,20 @@ export function QCForm({ user, token, onLogout }: QCFormProps) {
   
   const [colorOption, setColorOption] = useState('');
   const [customColorInput, setCustomColorInput] = useState('');
+
+  // Shoe Model (Hình thể) & Supplier Model states
+  const [shoeModel, setShoeModel] = useState('');
+  const [shoeModelOption, setShoeModelOption] = useState('');
+  const [isNoPo, setIsNoPo] = useState(false);
+  const [supplierModels, setSupplierModels] = useState<SupplierModelMapping[]>([]);
+  const [colorsList, setColorsList] = useState<string[]>([]);
+
+  // Dropdown list pickers for NHẬP MÃ MÀU and HÌNH THỂ
+  const [showColorDropdown, setShowColorDropdown] = useState(false);
+  const [colorFilterQuery, setColorFilterQuery] = useState('');
+  const [showModelDropdown, setShowModelDropdown] = useState(false);
+  const [modelFilterQuery, setModelFilterQuery] = useState('');
+  const [showProfileModal, setShowProfileModal] = useState(false);
 
   // Sub-component (Thành phần nhỏ) states
   const [subPart, setSubPart] = useState('');
@@ -140,6 +173,7 @@ export function QCForm({ user, token, onLogout }: QCFormProps) {
   const [backgroundTasks, setBackgroundTasks] = useState<BackgroundTask[]>([]);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const cameraInputRef = useRef<HTMLInputElement>(null);
 
   // Standard predefined floor list (Fallback)
   const [defaultFloors, setDefaultFloors] = useState<string[]>(['K63A', 'K63B', 'K73A', 'K73B']);
@@ -165,6 +199,12 @@ export function QCForm({ user, token, onLogout }: QCFormProps) {
   // Admin capability check
   const isAdmin = userProfile?.role === 'admin' || (user.email || '').toLowerCase() === 'pyvqcproject@gmail.com' || (user.email || '').toLowerCase().includes('admin');
 
+  const checkIsSolePart = (partName: string) => {
+    if (!partName) return true; // Default to sole if unselected
+    const norm = partName.toUpperCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim();
+    return norm.includes('DE') || partName.toUpperCase().includes('ĐẾ');
+  };
+
   const parseColorsConfig = (colorsArray: string[]) => {
     if (!colorsArray || !Array.isArray(colorsArray)) return [];
     return colorsArray.map(str => {
@@ -177,18 +217,21 @@ export function QCForm({ user, token, onLogout }: QCFormProps) {
   };
 
   const updatePartConfig = (partKey: string, fullConfigFromStorage: any) => {
-    let targetPartConfig = fullConfigFromStorage; // fallback
-    let configKey = 'detho';
-    if (partKey === 'MẶT GIÀY') {
+    if (!fullConfigFromStorage) return;
+    const normKey = (partKey || '').toUpperCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim();
+    let configKey: 'detho' | 'deson' | 'matgiay' = 'detho';
+    if (normKey.includes('MAT GIAY') || normKey.includes('MAT') || normKey.includes('UPPER')) {
       configKey = 'matgiay';
-      targetPartConfig = fullConfigFromStorage['matgiay'] || fullConfigFromStorage;
-    } else if (partKey === 'ĐẾ THÔ') {
-      configKey = 'detho';
-      targetPartConfig = fullConfigFromStorage['detho'] || fullConfigFromStorage['de'] || fullConfigFromStorage;
-    } else if (partKey === 'ĐẾ PHUN SƠN') {
+    } else if (normKey.includes('PHUN SON') || normKey.includes('SON')) {
       configKey = 'deson';
-      targetPartConfig = fullConfigFromStorage['deson'] || fullConfigFromStorage['de'] || fullConfigFromStorage;
+    } else {
+      configKey = 'detho';
     }
+
+    const targetPartConfig = fullConfigFromStorage[configKey] 
+      || (configKey === 'deson' ? fullConfigFromStorage['detho'] : null)
+      || fullConfigFromStorage['de'] 
+      || fullConfigFromStorage;
 
     if (targetPartConfig.floors && Array.isArray(targetPartConfig.floors)) {
       setDefaultFloors(targetPartConfig.floors);
@@ -202,23 +245,36 @@ export function QCForm({ user, token, onLogout }: QCFormProps) {
     if (targetPartConfig.suppliers && Array.isArray(targetPartConfig.suppliers)) setSupplierOptions(targetPartConfig.suppliers);
     if (targetPartConfig.colors && Array.isArray(targetPartConfig.colors)) {
       setColorConfigList(parseColorsConfig(targetPartConfig.colors));
+      setColorsList(targetPartConfig.colors);
+    } else {
+      setColorsList(DEFAULT_COLORS_LIST[configKey] || []);
     }
     const loadedSubParts = (targetPartConfig.subParts && Array.isArray(targetPartConfig.subParts) && targetPartConfig.subParts.length > 0)
       ? targetPartConfig.subParts
       : (DEFAULT_SUB_PARTS[configKey] || []);
     setSubPartOptions(loadedSubParts);
+
+    const loadedSupplierModels = (targetPartConfig.supplierModels && Array.isArray(targetPartConfig.supplierModels) && targetPartConfig.supplierModels.length > 0)
+      ? targetPartConfig.supplierModels
+      : (DEFAULT_SUPPLIER_MODELS[configKey] || []);
+    setSupplierModels(loadedSupplierModels);
   };
 
   const handlePartChange = (newPart: string) => {
-    if (!userProfile) return;
-    
-    // Update local profile state
-    const updatedProfile = { ...userProfile, part: newPart as QCUser['part'] };
-    setUserProfile(updatedProfile);
+    setCurrentPart(newPart);
+    localStorage.setItem('qc_current_part', newPart);
+    if (userProfile) {
+      const updatedProfile = { ...userProfile, part: newPart as QCUser['part'] };
+      setUserProfile(updatedProfile);
+    }
     setSubPart('');
     setSubPartOption('');
+    setShoeModel('');
+    setShoeModelOption('');
+    setColorCode('');
+    setColorOption('');
     
-    // Load matching config from localeStorage
+    // Load matching config from localStorage
     const localAppConfigStr = localStorage.getItem('local_app_config');
     if (localAppConfigStr) {
        try {
@@ -296,6 +352,7 @@ export function QCForm({ user, token, onLogout }: QCFormProps) {
       return Promise.race([promise, timeoutPromise]).finally(() => clearTimeout(timeoutId));
     };
     
+    let configKey = 'detho';
     try {
       // 1. Load user perm floors from Firestore
       const userDocRef = doc(db, 'qc_users', emailKey);
@@ -329,6 +386,12 @@ export function QCForm({ user, token, onLogout }: QCFormProps) {
       if (matched) {
         setUserProfile(matched);
         setIsUnauthorized(false);
+        if (matched.part) {
+          setCurrentPart(prev => prev || matched.part);
+          localStorage.setItem('qc_current_part', matched.part);
+        } else {
+          setCurrentPart(prev => prev || localStorage.getItem('qc_current_part') || 'ĐẾ THÔ');
+        }
         // Save/merge into local_qc_users so we can load it instantly next time on this device
         try {
           const localUsersStr = localStorage.getItem('local_qc_users');
@@ -389,29 +452,36 @@ export function QCForm({ user, token, onLogout }: QCFormProps) {
       const configSnap: any = await withTimeout(getDoc(configRef), 30000);
       if (configSnap.exists()) {
         const fullConfig = configSnap.data();
-        let targetPartConfig = fullConfig; // original flat config fallback
-        
-        let userPartContext = matched?.part || '';
-        let configKey = 'detho';
-        if (userPartContext === 'MẶT GIÀY') {
-           configKey = 'matgiay';
-           targetPartConfig = fullConfig['matgiay'] || fullConfig;
-        } else if (userPartContext === 'ĐẾ THÔ') {
-           configKey = 'detho';
-           targetPartConfig = fullConfig['detho'] || fullConfig['de'] || fullConfig;
-        } else if (userPartContext === 'ĐẾ PHUN SƠN') {
-           configKey = 'deson';
-           targetPartConfig = fullConfig['deson'] || fullConfig['de'] || fullConfig;
+        let userPartContext = currentPart || matched?.part || localStorage.getItem('qc_current_part') || 'ĐẾ THÔ';
+        const normKey = userPartContext.toUpperCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim();
+        configKey = 'detho';
+        if (normKey.includes('MAT GIAY') || normKey.includes('MAT') || normKey.includes('UPPER')) {
+          configKey = 'matgiay';
+        } else if (normKey.includes('PHUN SON') || normKey.includes('SON')) {
+          configKey = 'deson';
+        } else {
+          configKey = 'detho';
         }
+        let targetPartConfig = fullConfig[configKey] || (configKey === 'deson' ? fullConfig['detho'] : null) || fullConfig['de'] || fullConfig;
 
         if (targetPartConfig.floors && Array.isArray(targetPartConfig.floors)) setDefaultFloors(targetPartConfig.floors);
         if (targetPartConfig.errors && Array.isArray(targetPartConfig.errors)) setErrorOptions(targetPartConfig.errors);
         if (targetPartConfig.suppliers && Array.isArray(targetPartConfig.suppliers)) setSupplierOptions(targetPartConfig.suppliers);
-        if (targetPartConfig.colors && Array.isArray(targetPartConfig.colors)) setColorConfigList(parseColorsConfig(targetPartConfig.colors));
+        if (targetPartConfig.colors && Array.isArray(targetPartConfig.colors)) {
+          setColorConfigList(parseColorsConfig(targetPartConfig.colors));
+          setColorsList(targetPartConfig.colors);
+        } else {
+          setColorsList(DEFAULT_COLORS_LIST[configKey] || []);
+        }
         const subPartsToUse = (targetPartConfig.subParts && Array.isArray(targetPartConfig.subParts) && targetPartConfig.subParts.length > 0)
           ? targetPartConfig.subParts
           : (DEFAULT_SUB_PARTS[configKey] || []);
         setSubPartOptions(subPartsToUse);
+
+        const supplierModelsToUse = (targetPartConfig.supplierModels && Array.isArray(targetPartConfig.supplierModels) && targetPartConfig.supplierModels.length > 0)
+          ? targetPartConfig.supplierModels
+          : (DEFAULT_SUPPLIER_MODELS[configKey] || []);
+        setSupplierModels(supplierModelsToUse);
         
         localStorage.setItem('local_app_config', JSON.stringify(fullConfig));
       }
@@ -474,10 +544,16 @@ export function QCForm({ user, token, onLogout }: QCFormProps) {
       if (localConfig) {
         try {
           const parsed = JSON.parse(localConfig);
-          if (parsed.floors) setDefaultFloors(parsed.floors);
-          if (parsed.errors) setErrorOptions(parsed.errors);
-          if (parsed.suppliers) setSupplierOptions(parsed.suppliers);
-          if (parsed.colors) setColorConfigList(parseColorsConfig(parsed.colors));
+          const target = parsed[configKey] || parsed;
+          if (target.floors) setDefaultFloors(target.floors);
+          if (target.errors) setErrorOptions(target.errors);
+          if (target.suppliers) setSupplierOptions(target.suppliers);
+          if (target.colors) {
+            setColorConfigList(parseColorsConfig(target.colors));
+            setColorsList(target.colors);
+          }
+          if (target.supplierModels) setSupplierModels(target.supplierModels);
+          if (target.subParts) setSubPartOptions(target.subParts);
         } catch(e) {}
       }
     }
@@ -496,9 +572,6 @@ export function QCForm({ user, token, onLogout }: QCFormProps) {
           if (match) {
              setUserProfile(match);
              setIsUnauthorized(false);
-          } else {
-             // Let the async loadConfiguration determine if unauthorized
-             // to avoid flashing error before network check
           }
         } catch (e) {}
       } else if (emailKey === 'pyvqcproject@gmail.com') {
@@ -539,7 +612,11 @@ export function QCForm({ user, token, onLogout }: QCFormProps) {
           if (parsed.floors) setDefaultFloors(parsed.floors);
           if (parsed.errors) setErrorOptions(parsed.errors);
           if (parsed.suppliers) setSupplierOptions(parsed.suppliers);
-          if (parsed.colors) setColorConfigList(parseColorsConfig(parsed.colors));
+          if (parsed.colors) {
+            setColorConfigList(parseColorsConfig(parsed.colors));
+            setColorsList(parsed.colors);
+          }
+          if (parsed.supplierModels) setSupplierModels(parsed.supplierModels);
         } catch (e) {}
       }
     }
@@ -565,24 +642,126 @@ export function QCForm({ user, token, onLogout }: QCFormProps) {
     }
   }, [errorOption, customErrorInput]);
 
+  // Check if current part is Sole (Đế thô or Đế phun sơn)
+  const isSolePart = checkIsSolePart(currentPart || userProfile?.part || '');
+
+  // Available models based on selected supplier (or all models)
+  const availableModels = useMemo(() => {
+    let list: string[] = [];
+    if (supplierModels && supplierModels.length > 0) {
+      if (supplier && supplier !== 'KHÁC') {
+        list = supplierModels
+          .filter(sm => sm.supplier.toUpperCase() === supplier.toUpperCase())
+          .map(sm => sm.model);
+      }
+      if (list.length === 0) {
+        list = Array.from(new Set(supplierModels.map(sm => sm.model)));
+      }
+    }
+    if (list.length === 0) {
+      const fallbackKey = isSolePart ? 'detho' : 'matgiay';
+      list = DEFAULT_SUPPLIER_MODELS[fallbackKey]?.map(sm => sm.model) || ['FCXV5', 'FCXV6', 'FCXV7'];
+    }
+    return Array.from(new Set(list));
+  }, [supplierModels, supplier, isSolePart]);
+
+  // Available colors list: ONLY GENUINE COLOR CODES FOR MẶT GIÀY (UPPER PART)
+  // For Sole (Đế thô / Đế phun sơn), "NHẬP MÃ MÀU" uses availableModels directly!
+  const availableColors = useMemo(() => {
+    let list: string[] = [];
+    if (colorsList && colorsList.length > 0) {
+      list = [...colorsList];
+    }
+    
+    // Also include color codes from PO mappings
+    if (globalMappingsMap && Object.keys(globalMappingsMap).length > 0) {
+      const mapColors: string[] = Object.values(globalMappingsMap).filter((v): v is string => Boolean(v));
+      list = [...list, ...mapColors];
+    }
+
+    if (list.length === 0) {
+      list = DEFAULT_COLORS_LIST['matgiay'] || [];
+    }
+
+    // Deduplicate
+    let unique = Array.from(new Set(list.map(c => c.trim()).filter(Boolean)));
+
+    // Filter out any models (e.g. FCXV5, FCXV6) so colors NEVER show models
+    if (supplierModels && supplierModels.length > 0) {
+      const modelSet = new Set(supplierModels.map(sm => sm.model.toUpperCase()));
+      unique = unique.filter(c => !modelSet.has(c.toUpperCase()));
+    }
+    const knownModels = new Set(['FCXV5', 'FCXV6', 'FCXV7', 'FCXV8', 'PEG40', 'AF1-SOLE', 'DUNK-HIGH', 'PEGASUS-40']);
+    unique = unique.filter(c => !knownModels.has(c.toUpperCase()));
+
+    if (unique.length === 0) {
+      unique = ['MFCXVLI5', 'MFCXV2ZU', '100-WHITE', '001-BLACK', '400-ROYAL', 'RED-CRIMSON', '101-SAIL', '010-WOLF-GREY', 'NAVY-01', 'CHARCOAL-BLACK'];
+    }
+
+    return unique;
+  }, [colorsList, globalMappingsMap, supplierModels]);
+
+  const selectModel = (model: string) => {
+    setShoeModel(model);
+    setShoeModelOption(model);
+    setColorCode(model);
+    setColorOption(model);
+    const matchedSm = supplierModels.find(sm => sm.model.toUpperCase() === model.toUpperCase());
+    if (matchedSm && (!supplier || supplier === 'KHÁC')) {
+      setSupplier(matchedSm.supplier);
+      setSupplierOption(matchedSm.supplier);
+    }
+    setShowModelDropdown(false);
+  };
+
+  const selectColor = (colorOrModel: string) => {
+    setColorCode(colorOrModel);
+    setColorOption(colorOrModel);
+    setShoeModel(colorOrModel);
+    setShoeModelOption(colorOrModel);
+    if (isSolePart) {
+      const matchedSm = supplierModels.find(sm => sm.model.toUpperCase() === colorOrModel.toUpperCase());
+      if (matchedSm && (!supplier || supplier === 'KHÁC')) {
+        setSupplier(matchedSm.supplier);
+        setSupplierOption(matchedSm.supplier);
+      }
+    } else {
+      const match = colorConfigList.find(c => c.colorCode.toUpperCase() === colorOrModel.toUpperCase());
+      if (match && match.supplier && (!supplier || supplier === 'KHÁC')) {
+        setSupplier(match.supplier);
+        setSupplierOption(match.supplier);
+      }
+    }
+    setShowColorDropdown(false);
+  };
+
   // Handle PO input change (forces numbers only + resolves matching color via useEffect API)
   const handleOrderChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const numericValue = e.target.value.replace(/[^0-9]/g, ''); // PO is strictly digits
     setOrder(numericValue);
+    if (isNoPo) setIsNoPo(false);
   };
 
   // Find color mapping when order changes
   useEffect(() => {
-    if (!order) return;
+    if (!order || isNoPo || order === 'KHÔNG') return;
     
     // Search directly from local memory (sync loaded)
     const exactMatchColor = globalMappingsMap[order];
     if (exactMatchColor) {
       setColorCode(exactMatchColor);
+      if (isSolePart) {
+        setShoeModel(exactMatchColor);
+      }
+      const matchedSm = supplierModels.find(sm => sm.model.toUpperCase() === exactMatchColor.toUpperCase());
+      if (matchedSm && (!supplier || supplier === 'KHÁC')) {
+        setSupplier(matchedSm.supplier);
+        setSupplierOption(matchedSm.supplier);
+      }
     } else {
-      setColorCode(''); // Clear if not found
+      // Don't clear automatically if already entered
     }
-  }, [order, globalMappingsMap]);
+  }, [order, globalMappingsMap, isSolePart, supplierModels, isNoPo, supplier]);
 
   // Sync colorOption with colorCode when it changes externally
   useEffect(() => {
@@ -591,7 +770,6 @@ export function QCForm({ user, token, onLogout }: QCFormProps) {
     } else {
       const isMapped = colorConfigList.some(c => c.colorCode.toUpperCase() === colorCode.toUpperCase());
       if (isMapped) {
-        // Find exact casing from map if possible
         const exactItem = colorConfigList.find(c => c.colorCode.toUpperCase() === colorCode.toUpperCase());
         setColorOption(exactItem ? exactItem.colorCode : colorCode);
       } else {
@@ -633,28 +811,55 @@ export function QCForm({ user, token, onLogout }: QCFormProps) {
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    if (!date) {
+      setError('Vui lòng chọn ngày kiểm hàng.');
+      return;
+    }
+    const finalPart = currentPart || userProfile?.part || '';
+    if (!finalPart) {
+      setError('Vui lòng chọn hoặc gán bộ vị kiểm tra.');
+      return;
+    }
+    if (!subPart.trim()) {
+      setError('Vui lòng chọn hoặc nhập Thành phần nhỏ (chi tiết bộ vị). Không được để trống!');
+      return;
+    }
     if (!floor) {
-      setError('Vui lòng chọn lầu / khu vực thực hiện.');
+      setError('Vui lòng chọn Lầu / Khu vực thực hiện.');
       return;
     }
-    if (!order) {
-      setError('Vui lòng nhập đơn hàng (PO) dạng số.');
+    if (!order.trim()) {
+      setError("Vui lòng nhập đơn hàng (PO) dạng số hoặc tích chọn 'Không' nếu không có đơn hàng.");
       return;
     }
-    if (!colorCode.trim()) {
-      setError('Vui lòng nhập / cấu hình mã màu cho đơn hàng này.');
-      return;
+    const effectiveModel = isSolePart
+      ? (shoeModel.trim() || colorCode.trim())
+      : (shoeModel.trim() || colorCode.trim());
+    const effectiveColor = isSolePart
+      ? (colorCode.trim() || shoeModel.trim())
+      : colorCode.trim();
+
+    if (isSolePart) {
+      if (!effectiveModel) {
+        setError('Vui lòng chọn hoặc nhập Hình thể đế (ví dụ: FCXV5). Không được để trống!');
+        return;
+      }
+    } else {
+      if (!effectiveColor) {
+        setError('Vui lòng chọn hoặc nhập Mã màu mặt giày (ví dụ: MFCXVLI5). Không được để trống!');
+        return;
+      }
     }
     if (!supplier) {
-      setError('Vui lòng chọn xưởng cung ứng.');
+      setError('Vui lòng chọn Xưởng cung ứng. Không được để trống!');
       return;
     }
     if (!errorName.trim()) {
-      setError('Vui lòng kiểm tra và nhập tên loại lỗi kỹ thuật.');
+      setError('Vui lòng chọn hoặc nhập Loại lỗi kỹ thuật. Không được để trống!');
       return;
     }
     if (files.length === 0) {
-      setError('Vui lòng chọn ít nhất 1 hình ảnh báo cáo lỗi.');
+      setError('Vui lòng chọn hoặc chụp ít nhất 1 hình ảnh báo cáo lỗi.');
       return;
     }
     
@@ -666,11 +871,12 @@ export function QCForm({ user, token, onLogout }: QCFormProps) {
     const reportPayloadBase: any = {
       date,
       floor,
-      order,
-      colorCode,
-      errorName,
-      supplier,
-      part: userProfile?.part || '',
+      order: order.trim(),
+      colorCode: effectiveColor,
+      shoeModel: effectiveModel,
+      errorName: errorName.trim(),
+      supplier: supplier.trim(),
+      part: finalPart,
       subPart: subPart.trim(),
       employeeId: userProfile?.employeeId || user.email?.split('@')[0] || 'Unknown',
       employeeName: userProfile?.name || '',
@@ -683,13 +889,18 @@ export function QCForm({ user, token, onLogout }: QCFormProps) {
     const taskId = typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function'
       ? crypto.randomUUID()
       : `task_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
-    const taskTitle = `PO: ${order} - Lỗi: ${errorName}`;
+    const taskTitle = `PO: ${order} - ${effectiveModel || effectiveColor} (${floor})`;
 
     setBackgroundTasks(prev => [...prev, { id: taskId, title: taskTitle, progress: 0, status: 'uploading' }]);
 
     // Reset form immediately
     setOrder('');
+    setIsNoPo(false);
     setColorCode('');
+    setColorOption('');
+    setCustomColorInput('');
+    setShoeModel('');
+    setShoeModelOption('');
     setErrorOption('');
     setCustomErrorInput('');
     setSubPart('');
@@ -709,6 +920,7 @@ export function QCForm({ user, token, onLogout }: QCFormProps) {
       const safePart = sanitizeName(reportPayloadBase.part || 'Khong_Bo_Vi');
       const safeSubPart = reportPayloadBase.subPart ? sanitizeName(reportPayloadBase.subPart) : '';
       const safeOrder = sanitizeName(reportPayloadBase.order);
+      const safeModel = reportPayloadBase.shoeModel ? sanitizeName(reportPayloadBase.shoeModel) : '';
       const safeColor = sanitizeName(reportPayloadBase.colorCode);
       const safeError = sanitizeName(reportPayloadBase.errorName);
       const safeSupplier = sanitizeName(reportPayloadBase.supplier);
@@ -745,7 +957,8 @@ export function QCForm({ user, token, onLogout }: QCFormProps) {
           compressedBlob = file;
         }
         
-        const fileName = `${partPrefix}_${safeOrder}_${safeColor}_${safeError}_${safeSupplier}_${safeFloor}_${i + 1}_${timestamp}.jpg`;
+        const modelPart = safeModel ? `${safeModel}_` : '';
+        const fileName = `${partPrefix}_${safeOrder}_${modelPart}${safeColor}_${safeError}_${safeSupplier}_${safeFloor}_${i + 1}_${timestamp}.jpg`;
         let downloadUrl = '';
         
         if (!navigator.onLine) {
@@ -871,138 +1084,178 @@ export function QCForm({ user, token, onLogout }: QCFormProps) {
         </div>
       ) : (
         <>
-      {/* Header */}
-      <header className={`bg-[#000080] text-white px-3 sm:px-6 h-16 flex items-center justify-between shadow-md shrink-0 transition-transform duration-300 z-50 fixed top-0 inset-x-0 md:relative md:translate-y-0 ${!isAtTop ? '-translate-y-full' : 'translate-y-0'}`}>
-        <div className="flex items-center gap-3 sm:gap-6">
+      {/* Industrial Header */}
+      <header className="bg-slate-900 border-b border-slate-800 text-white px-3 sm:px-6 h-14 sm:h-16 flex items-center justify-between shadow-xs shrink-0 z-40 sticky top-0">
+        <div className="flex items-center gap-3 sm:gap-6 min-w-0">
           <div className="flex items-center shrink-0">
-            <div className="flex flex-col leading-tight">
-              <span className="font-extrabold text-sm sm:text-base tracking-tight text-white uppercase">IQC photo</span>
-              <div className="flex items-center gap-1 mt-0.5">
-                <span className="font-light text-xs sm:text-sm text-slate-300 uppercase leading-[0.8]">Library</span>
-                <span className="text-slate-300 leading-[0.8] text-xs font-light">-</span>
-                <span className="font-extrabold text-sm sm:text-base tracking-tight text-white uppercase leading-[0.8]">PYV</span>
+            <div className="flex flex-col leading-none">
+              <div className="flex items-center gap-1.5">
+                <span className="font-extrabold text-base sm:text-lg tracking-tight text-white font-mono">IQC PHOTO</span>
+                <span className="text-[10px] font-mono px-1.5 py-0.2 bg-blue-600/30 text-blue-400 border border-blue-500/40 rounded font-semibold hidden xs:inline">PYV</span>
               </div>
+              <span className="text-[10px] text-slate-400 font-mono tracking-wider mt-1 hidden sm:block">
+                QUALITY ASSURANCE SYSTEM
+              </span>
             </div>
-            
-            <div className="ml-3 pl-3 border-l border-white/30 flex items-center gap-2 sm:hidden">
-              <div className="flex flex-col">
-                <span className="text-[11px] font-semibold text-white tracking-wide">{userProfile?.name || user.email?.split('@')[0]}</span>
-                <span className="text-[9px] text-slate-300 tracking-wider">MaNV: {userProfile?.employeeId || 'Khách'}</span>
-              </div>
-            </div>
-
-            <span className="ml-3 text-sm font-bold opacity-90 uppercase tracking-widest border-l border-white/30 pl-3 hidden lg:inline-block">HỆ THỐNG BÁO CÁO CHẤT LƯỢNG</span>
           </div>
 
-          {/* Navigation Tabs */}
-          <nav className="hidden md:flex items-center bg-slate-900/60 p-1 rounded-lg">
+          {/* Navigation Tabs (Desktop / Tablet) */}
+          <nav className="hidden md:flex items-center bg-slate-800/80 p-1 rounded-md border border-slate-700/80 font-mono text-xs">
             <button
               type="button"
               onClick={() => setActiveTab('create')}
-              className={`px-3 py-1.5 rounded-md text-xs font-bold transition-all cursor-pointer ${activeTab === 'create' ? 'bg-blue-600 text-white' : 'text-slate-300 hover:text-white hover:bg-white/5'}`}
+              className={`px-3 py-1.5 rounded transition-all cursor-pointer font-bold ${activeTab === 'create' ? 'bg-blue-600 text-white shadow-xs' : 'text-slate-300 hover:text-white hover:bg-slate-700/50'}`}
             >
-              Tạo Báo Cáo
+              + TẠO BÁO CÁO
             </button>
             <button
               type="button"
               onClick={() => setActiveTab('history')}
-              className={`px-3 py-1.5 rounded-md text-xs font-bold transition-all cursor-pointer ${activeTab === 'history' ? 'bg-blue-600 text-white' : 'text-slate-300 hover:text-white hover:bg-white/5'}`}
+              className={`px-3 py-1.5 rounded transition-all cursor-pointer font-bold ${activeTab === 'history' ? 'bg-blue-600 text-white shadow-xs' : 'text-slate-300 hover:text-white hover:bg-slate-700/50'}`}
             >
-              Lịch Sử QC
+              LỊCH SỬ QC
             </button>
             {isAdmin && (
               <button
                 type="button"
                 onClick={() => setActiveTab('admin')}
-                className={`px-3 py-1.5 rounded-md text-xs font-bold transition-all cursor-pointer ${activeTab === 'admin' ? 'bg-blue-600 text-white' : 'text-slate-300 hover:text-white hover:bg-white/5'}`}
+                className={`px-3 py-1.5 rounded transition-all cursor-pointer font-bold ${activeTab === 'admin' ? 'bg-blue-600 text-white shadow-xs' : 'text-slate-300 hover:text-white hover:bg-slate-700/50'}`}
               >
-                Cấu hình (Admin)
+                CẤU HÌNH ADMIN
               </button>
             )}
           </nav>
         </div>
-        <div className="flex items-center gap-2 sm:gap-4">
+
+        <div className="flex items-center gap-2 sm:gap-4 min-w-0">
           {isAdmin && (
-            <div className="bg-blue-500/20 text-blue-300 border border-blue-500/30 px-2 py-0.5 rounded-md text-[10px] font-bold hidden md:flex items-center gap-1 shrink-0">
+            <div className="bg-slate-800 text-blue-400 border border-blue-500/40 px-2 py-0.5 rounded text-[10px] font-mono font-bold hidden md:flex items-center gap-1 shrink-0">
               <ShieldCheck className="h-3 w-3 text-blue-400" />
-              QUẢN TRỊ
+              QUẢN TRỊ VIÊN
             </div>
           )}
-          <div className="bg-emerald-500 text-white px-2.5 py-1 rounded-full text-xs font-semibold hidden md:flex items-center gap-1.5 shadow-inner">
-            <div className="w-1.5 h-1.5 bg-white rounded-full animate-pulse"></div> 
-            Đã kết nối
+          <div className="hidden lg:flex items-center gap-1.5 text-xs text-slate-300 font-mono shrink-0">
+            <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
+            <span>HỆ THỐNG ONLINE</span>
           </div>
-          <div className="text-right flex items-center gap-2 sm:gap-3 border-l border-white/10 pl-3 sm:pl-4 ml-1">
-            <div className="hidden sm:flex flex-col text-right">
-              <div className="text-sm font-semibold">{userProfile?.name || user.email?.split('@')[0]}</div>
-              <div className="text-[10px] opacity-75 flex justify-end gap-1.5 text-right font-medium">
-                <span>MaNV: {userProfile?.employeeId || 'Khách'}</span>
+
+          {/* User Profile Badge (Clickable for full profile on both Mobile and Desktop) */}
+          <button
+            type="button"
+            onClick={() => setShowProfileModal(true)}
+            className="flex items-center gap-2 sm:gap-2.5 border-l border-slate-800 pl-2 sm:pl-3 bg-transparent border-none text-left cursor-pointer hover:bg-slate-800/80 p-1 rounded transition-colors min-w-0"
+            title="Bấm để xem chi tiết thông tin nhân viên"
+          >
+            <div className="w-7 h-7 sm:w-8 sm:h-8 rounded bg-blue-600/30 border border-blue-500/50 flex items-center justify-center text-blue-300 shrink-0 font-bold font-mono text-xs">
+              {(userProfile?.name || user.email?.split('@')[0] || 'QC').charAt(0).toUpperCase()}
+            </div>
+            <div className="flex flex-col min-w-0 text-left">
+              <div 
+                className="text-xs font-bold text-slate-100 tracking-tight leading-tight max-w-[140px] xs:max-w-[200px] sm:max-w-[280px] truncate" 
+                title={userProfile?.name || user.email?.split('@')[0]}
+              >
+                {userProfile?.name || user.email?.split('@')[0]}
+              </div>
+              <div className="text-[10px] text-slate-400 font-mono flex items-center gap-1.5 leading-none mt-0.5">
+                <span>MÃ NV: <strong className="text-slate-200">{userProfile?.employeeId || 'Khách'}</strong></span>
+                {currentPart && <span className="text-blue-400 font-semibold hidden xs:inline">• {currentPart}</span>}
               </div>
             </div>
-            <button
-              type="button"
-              onClick={handleLogout}
-              className="h-8 w-8 bg-slate-700/50 hover:bg-slate-700 flex items-center justify-center rounded-full transition-colors text-slate-200 cursor-pointer border-none shrink-0"
-              title="Đăng xuất"
-            >
-              <LogOut className="h-4 w-4" />
-            </button>
-          </div>
+          </button>
+
+          <button
+            type="button"
+            onClick={handleLogout}
+            className="h-8 w-8 bg-slate-800 hover:bg-slate-700 border border-slate-700/80 flex items-center justify-center rounded transition-colors text-slate-300 hover:text-white cursor-pointer shrink-0"
+            title="Đăng xuất khỏi hệ thống"
+          >
+            <LogOut className="h-4 w-4" />
+          </button>
         </div>
       </header>
 
-      {/* Main Content */}
-      <main onScroll={handleScroll} className={`flex-1 overflow-y-auto p-3 pt-[76px] sm:p-4 sm:pt-[80px] md:p-4 lg:p-6 pb-32 md:pb-6 bg-[#F8FAFC] ${activeTab === 'create' ? 'block' : 'hidden'}`}>
+      {/* Main Content Workspace */}
+      <main onScroll={handleScroll} className={`flex-1 overflow-y-auto p-3 sm:p-5 lg:p-6 pb-24 md:pb-6 bg-slate-100 ${activeTab === 'create' ? 'block' : 'hidden'}`}>
         
-        <form onSubmit={handleSubmit} className="flex-1 flex flex-col lg:grid lg:grid-cols-[380px_1fr] gap-4 sm:gap-6 max-w-6xl mx-auto pb-6">
-            {/* Form Card */}
-            <section className="bg-white rounded-2xl border border-slate-100/80 shadow-[0_2px_12px_-4px_rgba(0,0,0,0.06)] p-4 sm:p-5 flex flex-col gap-3.5 sm:gap-4 shrink-0 lg:h-max shadow-sm">
-              <div className="border-b border-slate-100 pb-2.5 sm:pb-3 flex items-center justify-between">
-                <h2 className="m-0 text-sm sm:text-base font-extrabold text-slate-800 uppercase tracking-tight">Chi tiết đơn hàng</h2>
-                <span className="text-[10px] bg-slate-100 px-2 py-0.5 rounded text-slate-500 font-bold uppercase">Mẫu v1.4</span>
+        <form onSubmit={handleSubmit} className="max-w-6xl mx-auto flex flex-col lg:grid lg:grid-cols-12 gap-5 pb-6">
+            {/* Form Card: Specifications */}
+            <section className="lg:col-span-7 bg-white rounded-lg border border-slate-200 shadow-xs p-4 sm:p-6 flex flex-col gap-4">
+              <div className="border-b border-slate-200 pb-3 flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <span className="w-5 h-5 rounded bg-slate-900 text-white font-mono text-xs flex items-center justify-center font-bold">01</span>
+                  <h2 className="m-0 text-xs sm:text-sm font-bold text-slate-900 font-mono uppercase tracking-wider">Thông Số Kiểm Định Lô Hàng</h2>
+                </div>
+                <span className="text-[11px] font-mono text-slate-500 font-semibold">
+                  {currentPart || userProfile?.part || 'Đang chọn'}
+                </span>
+              </div>
+              
+              {/* QC Inspector Banner: Displays full inspector name clearly on Mobile & Desktop */}
+              <div className="bg-slate-50 border border-slate-200 rounded p-2.5 flex flex-wrap items-center justify-between gap-2 text-xs font-mono">
+                <div className="flex items-center gap-2 min-w-0">
+                  <UserIcon className="h-4 w-4 text-blue-600 shrink-0" />
+                  <span className="text-slate-500 font-semibold text-[11px]">Nhân viên QC:</span>
+                  <span className="font-bold text-slate-900 text-xs sm:text-sm break-words">
+                    {userProfile?.name || user.email?.split('@')[0]}
+                  </span>
+                </div>
+                <div className="flex items-center gap-1.5 shrink-0">
+                  <span className="bg-white border border-slate-200 text-slate-700 font-semibold px-2 py-0.5 rounded text-[11px]">
+                    Mã NV: <strong className="text-slate-900">{userProfile?.employeeId || 'QC'}</strong>
+                  </span>
+                  {userProfile?.floorGroup && (
+                    <span className="bg-blue-50 border border-blue-200 text-blue-700 font-semibold px-2 py-0.5 rounded text-[11px]">
+                      {userProfile.floorGroup}
+                    </span>
+                  )}
+                </div>
               </div>
               
               {/* Date Input & Part (Bộ vị) */}
-              <div className="grid grid-cols-2 gap-2.5 sm:gap-3 text-xs">
-                <div className="flex flex-col gap-1 sm:gap-1.5">
-                  <label htmlFor="date" className="sr-only">Ngày kiểm hàng</label>
+              <div className="grid grid-cols-2 gap-3 text-xs">
+                <div className="flex flex-col gap-1.5">
+                  <label htmlFor="date" className="text-[11px] font-bold text-slate-700 uppercase tracking-wider font-mono flex items-center justify-between">
+                    <span>Ngày Kiểm <span className="text-red-500">*</span></span>
+                  </label>
                   <input 
                     type="date" 
                     id="date" 
                     required 
                     value={date} 
                     onChange={e => setDate(e.target.value)} 
-                    className="px-3.5 py-3 sm:py-3.5 bg-slate-100/80 border-transparent border rounded-xl hover:bg-slate-100 focus:bg-white focus:ring-4 focus:ring-blue-500/15 focus:border-blue-500 focus:border-transparent outline-none transition-all font-semibold text-sm w-full" 
+                    className="h-11 sm:h-10 px-3 bg-white border border-slate-300 rounded hover:border-slate-400 focus:bg-white focus:ring-1 focus:ring-blue-600 focus:border-blue-600 outline-none transition-all font-semibold text-sm w-full text-slate-900" 
                   />
                 </div>
                 
-                <div className="flex flex-col gap-1 sm:gap-1.5 text-xs">
-                  <label className="sr-only">Bộ Vị {!isAdmin && (!userProfile?.parts || userProfile.parts.length <= 1) && <Lock className="h-3 w-3 text-slate-400" />}
+                <div className="flex flex-col gap-1.5 text-xs">
+                  <label className="text-[11px] font-bold text-slate-700 uppercase tracking-wider font-mono flex items-center justify-between">
+                    <span>Bộ Vị <span className="text-red-500">*</span></span>
+                    {!isAdmin && (!userProfile?.parts || userProfile.parts.length <= 1) && <Lock className="h-3 w-3 text-slate-400" />}
                   </label>
                   {isAdmin ? (
                     <select
-                      value={userProfile?.part || ''}
+                      value={currentPart}
                       onChange={(e) => handlePartChange(e.target.value)}
-                      className="px-3.5 py-3 sm:py-3.5 bg-orange-50 border-orange-200 border rounded-xl focus:bg-white focus:ring-4 focus:ring-blue-500/15 focus:border-blue-500 outline-none transition-all font-bold text-slate-800 text-sm w-full truncate"
+                      className="h-11 sm:h-10 px-3 bg-orange-50/60 border border-orange-300 rounded focus:bg-white focus:ring-1 focus:ring-blue-600 focus:border-blue-600 outline-none transition-all font-bold text-slate-900 text-sm w-full truncate cursor-pointer"
                     >
-                      <option value="">Bộ vị (Chưa gán...)</option>
+                      <option value="">-- Chọn bộ vị --</option>
                       <option value="ĐẾ THÔ">ĐẾ THÔ</option>
                       <option value="ĐẾ PHUN SƠN">ĐẾ PHUN SƠN</option>
                       <option value="MẶT GIÀY">MẶT GIÀY</option>
                     </select>
                   ) : userProfile?.parts && userProfile.parts.length > 1 ? (
                     <select
-                      value={userProfile?.part || ''}
+                      value={currentPart}
                       onChange={(e) => handlePartChange(e.target.value)}
-                      className="px-3.5 py-3 sm:py-3.5 bg-blue-50 border-blue-100 border rounded-xl focus:bg-white focus:ring-4 focus:ring-blue-500/15 focus:border-blue-500 outline-none transition-all font-bold text-slate-800 text-sm w-full truncate"
+                      className="h-11 sm:h-10 px-3 bg-white border border-slate-300 rounded focus:bg-white focus:ring-1 focus:ring-blue-600 focus:border-blue-600 outline-none transition-all font-bold text-slate-900 text-sm w-full truncate cursor-pointer"
                     >
                       {userProfile.parts.map(p => (
                         <option key={p} value={p}>{p}</option>
                       ))}
                     </select>
                   ) : (
-                    <div className="px-3.5 py-3 sm:py-3.5 bg-slate-100/80 border-transparent border rounded-xl font-bold text-slate-500 text-sm select-none truncate h-full flex items-center">
-                      {userProfile?.part || 'Bộ vị (Chưa gán...)'}
+                    <div className="h-11 sm:h-10 px-3 bg-slate-100 border border-slate-200 rounded font-bold text-slate-600 text-sm select-none truncate flex items-center">
+                      {currentPart || userProfile?.part || 'Bộ vị (Chưa gán...)'}
                     </div>
                   )}
                 </div>
@@ -1010,10 +1263,18 @@ export function QCForm({ user, token, onLogout }: QCFormProps) {
 
               {/* Thành phần nhỏ / Chi tiết bộ vị */}
               <div className="flex flex-col gap-1.5 text-xs">
-                <label htmlFor="subPart" className="sr-only">Thành phần nhỏ</label>
+                <div className="flex items-center justify-between">
+                  <label htmlFor="subPart" className="text-[11px] font-bold text-slate-700 uppercase tracking-wider font-mono">
+                    Thành phần nhỏ <span className="text-red-500">*</span>
+                  </label>
+                  <span className="text-[10px] text-slate-500 font-mono">
+                    {subPart ? `Đang chọn: ${subPart}` : 'Bắt buộc'}
+                  </span>
+                </div>
                 <div className="relative">
                   <select
                     id="subPart"
+                    required
                     value={subPartOption}
                     onChange={e => {
                       const val = e.target.value;
@@ -1026,9 +1287,9 @@ export function QCForm({ user, token, onLogout }: QCFormProps) {
                         setSubPart('');
                       }
                     }}
-                    className="w-full px-3.5 py-3 sm:py-3.5 bg-slate-100/80 border-transparent border rounded-xl hover:bg-slate-100 focus:bg-white focus:ring-4 focus:ring-blue-500/15 focus:border-blue-500 outline-none transition-all font-bold text-slate-800 text-sm"
+                    className="w-full h-11 sm:h-10 px-3 bg-white border border-slate-300 rounded hover:border-slate-400 focus:bg-white focus:ring-1 focus:ring-blue-600 focus:border-blue-600 outline-none transition-all font-bold text-slate-900 text-sm cursor-pointer"
                   >
-                    <option value="">Thành phần nhỏ ({userProfile?.part ? `${userProfile.part} - Tùy chọn` : 'Tùy chọn'}...)</option>
+                    <option value="" disabled>-- Chọn bộ vị * --</option>
                     {subPartOptions.map(sp => (
                       <option key={sp} value={sp}>{sp}</option>
                     ))}
@@ -1039,23 +1300,24 @@ export function QCForm({ user, token, onLogout }: QCFormProps) {
                 {subPartOption === 'CUSTOM' && (
                   <input
                     type="text"
+                    required
                     placeholder="Nhập tên thành phần nhỏ cụ thể (VD: Gót đế, Sơn viền, Lưỡi gà...)..."
                     value={subPart}
                     onChange={e => setSubPart(e.target.value)}
-                    className="px-3.5 py-2.5 bg-orange-50 border-orange-200 border-2 rounded-xl focus:bg-white focus:ring-4 focus:ring-orange-500/15 focus:border-orange-500 outline-none transition-all font-bold text-slate-800 text-sm"
+                    className="h-11 sm:h-10 px-3 bg-orange-50/50 border border-orange-300 rounded focus:bg-white focus:ring-1 focus:ring-orange-500 focus:border-orange-500 outline-none transition-all font-bold text-slate-900 text-sm"
                   />
                 )}
 
-                {/* Quick select chips for rapid 1-tap choice */}
+                {/* Quick select chips for rapid 1-tap choice on factory floor */}
                 {subPartOptions.length > 0 && !subPartOption && (
-                  <div className="flex items-center gap-1.5 overflow-x-auto py-0.5 scrollbar-none">
-                    <span className="text-[10px] text-slate-400 font-bold uppercase shrink-0">Gợi ý:</span>
+                  <div className="flex items-center gap-1.5 overflow-x-auto py-1 scrollbar-none">
+                    <span className="text-[10px] text-slate-400 font-mono uppercase shrink-0">GỢI Ý:</span>
                     {subPartOptions.slice(0, 6).map(sp => (
                       <button
                         key={sp}
                         type="button"
                         onClick={() => { setSubPartOption(sp); setSubPart(sp); }}
-                        className="text-[11px] font-bold bg-slate-100 hover:bg-blue-50 hover:text-blue-700 hover:border-blue-200 text-slate-600 px-2.5 py-1 rounded-lg border border-slate-200/60 whitespace-nowrap transition-colors cursor-pointer shrink-0"
+                        className="text-xs font-semibold bg-slate-100 hover:bg-blue-50 hover:text-blue-700 hover:border-blue-300 text-slate-700 px-2.5 py-1 rounded border border-slate-200 whitespace-nowrap transition-colors cursor-pointer shrink-0"
                       >
                         {sp}
                       </button>
@@ -1065,11 +1327,15 @@ export function QCForm({ user, token, onLogout }: QCFormProps) {
               </div>
 
               {/* Floor and Order Block */}
-              <div className="grid grid-cols-2 gap-2.5 sm:gap-3 text-xs">
+              <div className="grid grid-cols-2 gap-3 text-xs">
                 
                 {/* LẦU / KHU VỰC DROPDOWN */}
-                <div className="flex flex-col gap-1 sm:gap-1.5">
-                  <label htmlFor="floor" className="sr-only">Lầu / Khu vực</label>
+                <div className="flex flex-col gap-1.5">
+                  <div className="flex items-center justify-between">
+                    <label htmlFor="floor" className="text-[11px] font-bold text-slate-700 uppercase tracking-wider font-mono">
+                      Lầu / Khu vực <span className="text-red-500">*</span>
+                    </label>
+                  </div>
                   <select
                     id="floor"
                     required
@@ -1082,9 +1348,9 @@ export function QCForm({ user, token, onLogout }: QCFormProps) {
                         setFloor('');
                       }
                     }}
-                    className="px-3.5 py-3 sm:py-3.5 bg-slate-100/80 border-transparent border rounded-xl hover:bg-slate-100 focus:bg-white focus:ring-4 focus:ring-blue-500/15 focus:border-blue-500 outline-none transition-all font-bold text-slate-800 text-sm"
+                    className="h-11 sm:h-10 px-3 bg-white border border-slate-300 rounded hover:border-slate-400 focus:bg-white focus:ring-1 focus:ring-blue-600 focus:border-blue-600 outline-none transition-all font-bold text-slate-900 text-sm cursor-pointer"
                   >
-                    <option value="" disabled>Lầu / Khu vực (-- Chọn lầu --)</option>
+                    <option value="" disabled>-- Chọn lầu * --</option>
                     {floorOptions.map((fOpt) => (
                       <option key={fOpt} value={fOpt}>
                         {fOpt}
@@ -1100,89 +1366,250 @@ export function QCForm({ user, token, onLogout }: QCFormProps) {
                       placeholder="Nhập tên lầu mới..."
                       value={floor}
                       onChange={e => setFloor(e.target.value.toUpperCase())}
-                      className="mt-1.5 px-3 py-2.5 bg-orange-50 border-orange-200 border-2 rounded-xl focus:bg-white focus:ring-4 focus:ring-orange-500/15 focus:border-orange-500 outline-none transition-all font-bold text-slate-800 text-sm"
+                      className="mt-1 h-10 px-3 bg-orange-50/50 border border-orange-300 rounded focus:bg-white focus:ring-1 focus:ring-orange-500 focus:border-orange-500 outline-none transition-all font-bold text-slate-900 text-sm"
                     />
                   )}
                 </div>
 
-                {/* ĐƠN HÀNG PO: NUMERIC FORCED */}
-                <div className="flex flex-col gap-1 sm:gap-1.5">
-                  <label htmlFor="order" className="sr-only">Đơn hàng (PO)</label>
+                {/* ĐƠN HÀNG PO: NUMERIC OR CHECK "KHÔNG" */}
+                <div className="flex flex-col gap-1.5">
+                  <div className="flex items-center justify-between">
+                    <label htmlFor="order" className="text-[11px] font-bold text-slate-700 uppercase tracking-wider font-mono">
+                      Đơn hàng PO <span className="text-red-500">*</span>
+                    </label>
+                    <label 
+                      className={`flex items-center gap-1 cursor-pointer px-1.5 py-0.5 rounded text-[11px] font-mono font-bold transition-all border ${
+                        isNoPo 
+                          ? 'bg-red-50 text-red-700 border-red-200' 
+                          : 'bg-slate-100 text-slate-600 border-slate-200 hover:bg-slate-200'
+                      }`}
+                      title="Nếu không có PO hoặc chưa có đơn hàng, hãy tích chọn 'Không'"
+                    >
+                      <input 
+                        type="checkbox" 
+                        id="noPoCheck"
+                        checked={isNoPo}
+                        onChange={e => {
+                          const checked = e.target.checked;
+                          setIsNoPo(checked);
+                          if (checked) {
+                            setOrder('KHÔNG');
+                          } else {
+                            setOrder('');
+                          }
+                        }}
+                        className="h-3.5 w-3.5 rounded text-red-600 focus:ring-red-500 border-slate-300 cursor-pointer"
+                      />
+                      <span>Không PO</span>
+                    </label>
+                  </div>
                   <input 
                     type="text" 
                     id="order" 
-                    required 
-                    pattern="[0-9]*"
-                    inputMode="numeric"
-                    placeholder="Đơn hàng PO (Chỉ nhập số)" 
+                    required={!isNoPo}
+                    disabled={isNoPo}
+                    pattern={isNoPo ? undefined : "[0-9]*"}
+                    inputMode={isNoPo ? undefined : "numeric"}
+                    placeholder={isNoPo ? "KHÔNG CÓ PO" : "Số PO (VD: 123456) *"} 
                     value={order} 
                     onChange={handleOrderChange}
-                    onFocus={(e) => {
-                      setTimeout(() => {
-                        e.target.scrollIntoView({ behavior: 'smooth', block: 'center' });
-                      }, 300);
-                    }}
-                    className="px-3.5 py-3 sm:py-3.5 bg-slate-100/80 border-transparent border rounded-xl hover:bg-slate-100 focus:bg-white focus:ring-4 focus:ring-blue-500/15 focus:border-blue-500 focus:border-transparent outline-none transition-all font-mono font-bold text-slate-800 text-sm" 
-                    title="Mã PO bắt buộc là số"
+                    className={`h-11 sm:h-10 px-3 border rounded outline-none transition-all font-mono font-bold text-sm ${
+                      isNoPo 
+                        ? 'bg-slate-100 border-slate-200 text-slate-500 italic cursor-not-allowed' 
+                        : 'bg-white border-slate-300 hover:border-slate-400 focus:bg-white focus:ring-1 focus:ring-blue-600 focus:border-blue-600 text-slate-900'
+                    }`}
+                    title={isNoPo ? "Đã chọn không có PO" : "Mã PO bắt buộc là số"}
                   />
                 </div>
               </div>
 
-              {/* Color Code and Supplier Block */}
-              <div className="grid grid-cols-2 gap-2.5 sm:gap-3 text-xs">
+              {/* HÀNG 1: HÌNH THỂ HOẶC MÃ MÀU (KHÔNG HIỂN THỊ CÙNG LÚC) & XƯỞNG CUNG ỨNG */}
+              <div className="grid grid-cols-2 gap-3 text-xs">
                 
-                {/* MÃ MÀU: AUTO RESOLVED OR MANUAL */}
-                <div className="flex flex-col gap-1 sm:gap-1.5">
-                  <label htmlFor="colorCode" className="sr-only">Mã màu</label>
-                  {colorConfigList.length > 0 ? (
-                    <>
-                      <select
-                        id="colorOption"
+                {/* 1. BỘ VỊ ĐẾ (ĐẾ THÔ + PHUN SƠN): CHỈ HIỂN THỊ "NHẬP HÌNH THỂ", ẨN Ô MÃ MÀU */}
+                {isSolePart && (
+                  <div className="flex flex-col gap-1.5 relative">
+                    <div className="flex items-center justify-between">
+                      <label htmlFor="shoeModel" className="text-[11px] font-bold text-slate-700 uppercase tracking-wider font-mono flex items-center gap-1">
+                        <Box className="h-3 w-3 text-blue-600" />
+                        <span>Hình thể <span className="text-red-500">*</span></span>
+                      </label>
+                      <span className="text-[10px] text-blue-700 font-mono font-semibold">
+                        [ĐẾ]
+                      </span>
+                    </div>
+                    <div className="relative">
+                      <input
+                        type="text"
+                        id="shoeModel"
                         required
-                        value={colorOption}
+                        value={shoeModel}
                         onChange={e => {
-                          setColorOption(e.target.value);
-                          if (e.target.value !== 'CUSTOM' && e.target.value !== '') {
-                            setColorCode(e.target.value);
-                          } else if (e.target.value === 'CUSTOM') {
-                            setColorCode('');
-                          }
+                          const val = e.target.value.toUpperCase();
+                          setShoeModel(val);
+                          setColorCode(val);
                         }}
-                        className="px-3.5 py-3 sm:py-3.5 bg-slate-100/80 border-transparent border rounded-xl hover:bg-slate-100 focus:bg-white focus:ring-4 focus:ring-blue-500/15 focus:border-blue-500 outline-none transition-all font-semibold text-slate-800 text-sm"
+                        onFocus={() => setShowModelDropdown(true)}
+                        placeholder="NHẬP HÌNH THỂ (VD: FCXV5) *"
+                        className="w-full h-11 sm:h-10 px-3 bg-white border border-slate-300 rounded hover:border-slate-400 focus:bg-white focus:ring-1 focus:ring-blue-600 focus:border-blue-600 outline-none transition-all font-mono font-bold text-slate-900 text-sm uppercase pr-8"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setShowModelDropdown(!showModelDropdown)}
+                        className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 cursor-pointer p-1"
+                        title="Mở danh sách hình thể"
                       >
-                        <option value="" disabled>-- Chọn mã màu --</option>
-                        {Array.from(new Set(colorConfigList.map(c => c.colorCode))).map(c => (
-                          <option key={c} value={c}>{c}</option>
-                        ))}
-                        <option value="CUSTOM">➕ Khác (Tự nhập)...</option>
-                      </select>
-                      {colorOption === 'CUSTOM' && (
-                        <input
-                          type="text"
-                          required
-                          placeholder="Nhập mã màu mới..."
-                          value={colorCode}
-                          onChange={e => setColorCode(e.target.value)}
-                          className="mt-1 px-3 py-2 border border-slate-300 rounded-lg bg-white focus:ring-2 focus:ring-orange-400 outline-none transition-all font-semibold text-slate-800 uppercase text-sm shadow-inner"
-                        />
-                      )}
-                    </>
-                  ) : (
-                    <input 
-                      type="text" 
-                      id="colorCode" 
-                      required 
-                      placeholder="Nhập mã màu" 
-                      value={colorCode} 
-                      onChange={e => setColorCode(e.target.value)} 
-                      className="px-3.5 py-3 sm:py-3.5 bg-slate-100/80 border-transparent border rounded-xl hover:bg-slate-100 focus:bg-white focus:ring-4 focus:ring-blue-500/15 focus:border-blue-500 focus:border-transparent outline-none transition-all font-semibold text-slate-800 uppercase text-sm" 
-                    />
-                  )}
-                </div>
+                        <ChevronDown className={`h-4 w-4 transition-transform ${showModelDropdown ? 'rotate-180' : ''}`} />
+                      </button>
+                    </div>
+
+                    {/* Dropdown list of models for Sole */}
+                    {showModelDropdown && (
+                      <>
+                        <div className="fixed inset-0 z-20" onClick={() => setShowModelDropdown(false)} />
+                        <div className="absolute top-full left-0 right-0 mt-1 bg-white border border-slate-300 rounded shadow-lg z-30 p-2 space-y-1.5">
+                          <div className="flex items-center justify-between pb-1 border-b border-slate-100">
+                            <span className="text-[10px] font-bold font-mono text-slate-700 uppercase">
+                              DANH SÁCH HÌNH THỂ {supplier ? `(${supplier})` : ''}
+                            </span>
+                            <button
+                              type="button"
+                              onClick={() => setShowModelDropdown(false)}
+                              className="text-[10px] text-slate-400 hover:text-slate-700 font-mono font-bold cursor-pointer"
+                            >
+                              ĐÓNG ✕
+                            </button>
+                          </div>
+                          <input
+                            type="text"
+                            value={modelFilterQuery}
+                            onChange={e => setModelFilterQuery(e.target.value)}
+                            placeholder="Lọc nhanh (VD: FCXV5)..."
+                            className="w-full p-2 text-xs font-mono font-semibold border border-slate-200 rounded outline-none focus:ring-1 focus:ring-blue-600 bg-slate-50 uppercase"
+                            autoFocus
+                          />
+                          <div className="max-h-48 overflow-y-auto divide-y divide-slate-100">
+                            {availableModels
+                              .filter(m => !modelFilterQuery.trim() || m.toLowerCase().includes(modelFilterQuery.toLowerCase()))
+                              .map(m => (
+                                <button
+                                  key={m}
+                                  type="button"
+                                  onClick={() => selectModel(m)}
+                                  className={`w-full text-left p-2 rounded text-xs font-mono font-bold flex items-center justify-between hover:bg-blue-50 transition-colors cursor-pointer ${shoeModel === m ? 'text-blue-700 bg-blue-50 font-extrabold' : 'text-slate-800'}`}
+                                >
+                                  <span>{m}</span>
+                                  {shoeModel === m && <Check className="h-3.5 w-3.5 text-blue-600" />}
+                                </button>
+                              ))}
+                            {availableModels.filter(m => !modelFilterQuery.trim() || m.toLowerCase().includes(modelFilterQuery.toLowerCase())).length === 0 && (
+                              <div className="text-center py-2 text-slate-400 text-xs italic">
+                                Không có trong list. Bạn có thể tự gõ tên hình thể.
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      </>
+                    )}
+                  </div>
+                )}
+
+                {/* 2. BỘ VỊ MẶT GIÀY: CHỈ HIỂN THỊ "NHẬP MÃ MÀU", ẨN Ô HÌNH THỂ */}
+                {!isSolePart && (
+                  <div className="flex flex-col gap-1.5 relative">
+                    <div className="flex items-center justify-between">
+                      <label htmlFor="colorCode" className="text-[11px] font-bold text-slate-700 uppercase tracking-wider font-mono flex items-center gap-1">
+                        <Sparkles className="h-3 w-3 text-emerald-600" />
+                        <span>Mã màu <span className="text-red-500">*</span></span>
+                      </label>
+                      <span className="text-[10px] text-emerald-700 font-mono font-semibold">
+                        [MẶT GIÀY]
+                      </span>
+                    </div>
+                    
+                    <div className="relative">
+                      <input 
+                        type="text" 
+                        id="colorCode" 
+                        required 
+                        placeholder="NHẬP MÃ MÀU (VD: MFCXVLI5) *" 
+                        value={colorCode} 
+                        onChange={e => {
+                          const val = e.target.value.toUpperCase();
+                          setColorCode(val);
+                          setShoeModel(val);
+                        }}
+                        onFocus={() => setShowColorDropdown(true)}
+                        className="w-full h-11 sm:h-10 px-3 bg-white border border-slate-300 rounded hover:border-slate-400 focus:bg-white focus:ring-1 focus:ring-emerald-600 focus:border-emerald-600 outline-none transition-all font-mono font-bold text-slate-900 uppercase text-sm pr-8" 
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setShowColorDropdown(!showColorDropdown)}
+                        className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 cursor-pointer p-1"
+                        title="Mở danh sách mã màu"
+                      >
+                        <ChevronDown className={`h-4 w-4 transition-transform ${showColorDropdown ? 'rotate-180' : ''}`} />
+                      </button>
+                    </div>
+
+                    {/* Dropdown list for NHẬP MÃ MÀU (Mặt giày) */}
+                    {showColorDropdown && (
+                      <>
+                        <div className="fixed inset-0 z-20" onClick={() => setShowColorDropdown(false)} />
+                        <div className="absolute top-full left-0 right-0 mt-1 bg-white border border-slate-300 rounded shadow-lg z-30 p-2 space-y-1.5">
+                          <div className="flex items-center justify-between pb-1 border-b border-slate-100">
+                            <span className="text-[10px] font-bold font-mono text-emerald-800 uppercase">
+                              DANH SÁCH MÃ MÀU MẶT GIÀY
+                            </span>
+                            <button
+                              type="button"
+                              onClick={() => setShowColorDropdown(false)}
+                              className="text-[10px] text-slate-400 hover:text-slate-700 font-mono font-bold cursor-pointer"
+                            >
+                              ĐÓNG ✕
+                            </button>
+                          </div>
+                          <input
+                            type="text"
+                            value={colorFilterQuery}
+                            onChange={e => setColorFilterQuery(e.target.value)}
+                            placeholder="Lọc nhanh (VD: MFCXVLI5)..."
+                            className="w-full p-2 text-xs font-mono font-semibold border border-slate-200 rounded outline-none focus:ring-1 focus:ring-emerald-600 bg-slate-50 uppercase"
+                            autoFocus
+                          />
+                          <div className="max-h-48 overflow-y-auto divide-y divide-slate-100">
+                            {availableColors
+                              .filter(item => !colorFilterQuery.trim() || item.toLowerCase().includes(colorFilterQuery.toLowerCase()))
+                              .map(item => (
+                                <button
+                                  key={item}
+                                  type="button"
+                                  onClick={() => selectColor(item)}
+                                  className={`w-full text-left p-2 rounded text-xs font-mono font-bold flex items-center justify-between hover:bg-emerald-50 transition-colors cursor-pointer ${colorCode === item ? 'text-emerald-700 bg-emerald-50 font-extrabold' : 'text-slate-800'}`}
+                                >
+                                  <span>{item}</span>
+                                  {colorCode === item && <Check className="h-3.5 w-3.5 text-emerald-600" />}
+                                </button>
+                              ))}
+                            {availableColors.filter(item => !colorFilterQuery.trim() || item.toLowerCase().includes(colorFilterQuery.toLowerCase())).length === 0 && (
+                              <div className="text-center py-2 text-slate-400 text-xs italic">
+                                Không có trong danh sách. Bạn có thể tự gõ mã màu.
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      </>
+                    )}
+                  </div>
+                )}
 
                 {/* XƯỞNG CUNG ỨNG: DROPDOWN CHOSEN */}
-                <div className="flex flex-col gap-1 sm:gap-1.5">
-                  <label htmlFor="supplier" className="sr-only">Xưởng cung ứng</label>
+                <div className="flex flex-col gap-1.5">
+                  <div className="flex items-center justify-between">
+                    <label htmlFor="supplier" className="text-[11px] font-bold text-slate-700 uppercase tracking-wider font-mono">
+                      Xưởng cung ứng <span className="text-red-500">*</span>
+                    </label>
+                  </div>
                   <select
                     id="supplier"
                     required
@@ -1195,9 +1622,9 @@ export function QCForm({ user, token, onLogout }: QCFormProps) {
                         setSupplier('');
                       }
                     }}
-                    className="px-3.5 py-3 sm:py-3.5 bg-slate-100/80 border-transparent border rounded-xl hover:bg-slate-100 focus:bg-white focus:ring-4 focus:ring-blue-500/15 focus:border-blue-500 outline-none transition-all font-semibold text-slate-800 text-sm"
+                    className="h-11 sm:h-10 px-3 bg-white border border-slate-300 rounded hover:border-slate-400 focus:bg-white focus:ring-1 focus:ring-blue-600 focus:border-blue-600 outline-none transition-all font-bold text-slate-900 text-sm cursor-pointer"
                   >
-                    <option value="" disabled>Xưởng cung ứng (-- Chọn xưởng --)</option>
+                    <option value="" disabled>-- Chọn xưởng * --</option>
                     {supplierOptions.map((supplierName) => (
                       <option key={supplierName} value={supplierName}>
                         {supplierName}
@@ -1212,16 +1639,20 @@ export function QCForm({ user, token, onLogout }: QCFormProps) {
                       required
                       placeholder="Nhập tên xưởng mới..."
                       value={supplier}
-                      onChange={e => setSupplier(e.target.value)}
-                      className="mt-1.5 px-3 py-2.5 bg-orange-50 border-orange-200 border-2 rounded-xl focus:bg-white focus:ring-4 focus:ring-orange-500/15 focus:border-orange-500 outline-none transition-all font-bold text-slate-800 text-sm"
+                      onChange={e => setSupplier(e.target.value.toUpperCase())}
+                      className="mt-1 h-10 px-3 bg-orange-50/50 border border-orange-300 rounded focus:bg-white focus:ring-1 focus:ring-orange-500 focus:border-orange-500 outline-none transition-all font-bold text-slate-900 text-sm"
                     />
                   )}
                 </div>
               </div>
 
-              {/* TÊN LOẠI LỖI KỸ THUẬT: DROPDOWN OR ADD NEW */}
-              <div className="flex flex-col gap-1 sm:gap-1.5 text-xs">
-                <label htmlFor="errorDropdown" className="sr-only">Tên lỗi</label>
+              {/* HÀNG 2: TÊN LOẠI LỖI KỸ THUẬT: DROPDOWN OR ADD NEW */}
+              <div className="flex flex-col gap-1.5 text-xs">
+                <div className="flex items-center justify-between">
+                  <label htmlFor="errorDropdown" className="text-[11px] font-bold text-slate-700 uppercase tracking-wider font-mono">
+                    Loại lỗi kỹ thuật <span className="text-red-500">*</span>
+                  </label>
+                </div>
                 
                 <select
                   id="errorDropdown"
@@ -1231,9 +1662,9 @@ export function QCForm({ user, token, onLogout }: QCFormProps) {
                     setErrorOption(e.target.value);
                     if (e.target.value !== 'CUSTOM') setCustomErrorInput('');
                   }}
-                  className="px-3.5 py-3 sm:py-3.5 bg-slate-100/80 border-transparent border rounded-xl hover:bg-slate-100 focus:bg-white focus:ring-4 focus:ring-blue-500/15 focus:border-blue-500 outline-none transition-all font-semibold text-slate-800 text-sm"
+                  className="h-11 sm:h-10 px-3 bg-white border border-slate-300 rounded hover:border-slate-400 focus:bg-white focus:ring-1 focus:ring-blue-600 focus:border-blue-600 outline-none transition-all font-semibold text-slate-900 text-sm cursor-pointer"
                 >
-                  <option value="">-- Chọn loại lỗi đang bị --</option>
+                  <option value="">-- Chọn loại lỗi đang bị * --</option>
                   {errorOptions.map((eName) => (
                     <option key={eName} value={eName}>
                       {eName}
@@ -1249,59 +1680,88 @@ export function QCForm({ user, token, onLogout }: QCFormProps) {
                     placeholder="Nhập chi tiết tên lỗi kỹ thuật mới..."
                     value={customErrorInput}
                     onChange={e => setCustomErrorInput(e.target.value)}
-                    className="mt-1 px-3.5 py-3 sm:py-3.5 border border-blue-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none transition-all font-semibold bg-blue-50/20 text-slate-805 text-sm animate-in slide-in-from-top-1.5 duration-150"
+                    className="mt-1 h-11 sm:h-10 px-3 border border-blue-400 rounded focus:ring-1 focus:ring-blue-600 outline-none transition-all font-semibold bg-blue-50/20 text-slate-900 text-sm"
                   />
                 )}
               </div>
 
               {/* GHI CHÚ CHI TIẾT */}
-              <div className="flex flex-col gap-1 sm:gap-1.5 text-xs">
-                <label htmlFor="note" className="sr-only">Ghi chú chi tiết vấn đề</label>
+              <div className="flex flex-col gap-1.5 text-xs">
+                <label htmlFor="note" className="text-[11px] font-bold text-slate-700 uppercase tracking-wider font-mono">
+                  Ghi chú kiểm tra (Tùy chọn)
+                </label>
                 <textarea
                   id="note"
-                  placeholder="Ghi chú chi tiết vấn đề (Mô tả cụ thể hoặc hướng xử lý, không bắt buộc)..."
+                  placeholder="Mô tả cụ thể vị trí lỗi, mức độ hoặc lưu ý xử lý nếu có..."
                   value={note}
                   onChange={e => setNote(e.target.value)}
                   rows={2}
-                  className="px-3.5 py-3 sm:py-3.5 bg-slate-100/80 border-transparent border rounded-xl hover:bg-slate-100 focus:bg-white focus:ring-4 focus:ring-blue-500/15 focus:border-blue-500 outline-none transition-all text-slate-800 text-sm resize-y min-h-[80px]"
+                  className="p-3 bg-white border border-slate-300 rounded hover:border-slate-400 focus:bg-white focus:ring-1 focus:ring-blue-600 focus:border-blue-600 outline-none transition-all text-slate-900 text-sm resize-y min-h-[70px]"
                 />
               </div>
-
-              
             </section>
 
-            {/* Upload Card */}
-            <section className="bg-white rounded-2xl border border-slate-100/80 shadow-[0_2px_12px_-4px_rgba(0,0,0,0.06)] p-5 flex flex-col gap-4 lg:overflow-hidden min-h-[500px] shadow-sm">
-              
+            {/* Upload Card: Evidence */}
+            <section className="lg:col-span-5 bg-white rounded-lg border border-slate-200 shadow-xs p-4 sm:p-6 flex flex-col gap-4">
+              <div className="border-b border-slate-200 pb-3 flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <span className="w-5 h-5 rounded bg-slate-900 text-white font-mono text-xs flex items-center justify-center font-bold">02</span>
+                  <h2 className="m-0 text-xs sm:text-sm font-bold text-slate-900 font-mono uppercase tracking-wider">Minh Chứng Hình Ảnh Lỗi</h2>
+                </div>
+                <span className="text-[11px] font-mono text-slate-500 font-bold">
+                  {files.length} ẢNH
+                </span>
+              </div>
 
               {success && (
-                <div className="rounded-2xl bg-emerald-50 p-4 border border-emerald-100 shadow-sm shadow-emerald-500/5 flex flex-col gap-1.5 shrink-0 animate-in zoom-in-95 duration-200">
+                <div className="rounded bg-emerald-50 p-3.5 border border-emerald-200 flex flex-col gap-1 shrink-0 animate-in fade-in duration-200">
                   <div className="flex items-center gap-2">
-                    <CheckCircle className="h-4.5 w-4.5 text-emerald-500 shrink-0" />
-                    <span className="text-sm font-bold text-emerald-800">Đã gửi báo cáo thành công!</span>
+                    <CheckCircle className="h-4 w-4 text-emerald-600 shrink-0" />
+                    <span className="text-xs font-bold text-emerald-900 font-mono">ĐÃ GỬI BÁO CÁO THÀNH CÔNG!</span>
                   </div>
-                  <p className="text-xs text-emerald-700 ml-6 leading-relaxed font-semibold">
-                    {successMessage || 'Báo cáo đã được lưu trữ & tải ảnh hoàn tất.'}
+                  <p className="text-xs text-emerald-800 ml-6 leading-relaxed">
+                    {successMessage || 'Biên bản đã được lưu trữ và tiến hành tải ngầm lên hệ thống.'}
                   </p>
                 </div>
               )}
 
               {error && (
-                <div className="rounded-xl bg-red-50 p-3.5 border border-red-200 shrink-0 flex items-start gap-2 text-xs text-red-800 font-semibold">
-                  <AlertCircle className="h-4.5 w-4.5 text-red-500 shrink-0 mt-0.5" />
+                <div className="rounded bg-red-50 p-3.5 border border-red-200 shrink-0 flex items-start gap-2 text-xs text-red-900 font-semibold leading-relaxed">
+                  <AlertCircle className="h-4 w-4 text-red-600 shrink-0 mt-0.5" />
                   <span>{error}</span>
                 </div>
               )}
 
-              <label
-                htmlFor="file-upload"
-                className="border-2 border-dashed border-slate-350 bg-[#F8FAFC]/50 hover:border-blue-500 hover:bg-blue-50/30 cursor-pointer rounded-xl p-6 sm:p-8 text-center transition-all shrink-0"
-              >
-                <div className="flex flex-col items-center justify-center space-y-2 select-none">
-                  <div className="text-3xl font-light text-slate-400 hover:text-blue-500 mb-1">+</div>
-                  <div className="font-extrabold text-xs tracking-wider text-slate-650 uppercase">Nhấn để tải lên hoặc kéo thả ảnh lỗi</div>
-                  <div className="text-[10px] text-slate-450">Tự động nén chất lượng cao siêu tốc (Max 1280px)</div>
-                </div>
+              {/* Action Buttons for Mobile & Desktop */}
+              <div className="grid grid-cols-2 gap-2 shrink-0">
+                <button
+                  type="button"
+                  onClick={() => cameraInputRef.current?.click()}
+                  className="h-11 sm:h-10 px-3 bg-slate-900 hover:bg-slate-800 active:bg-black text-white font-mono font-bold text-xs uppercase tracking-wider rounded border border-slate-800 flex items-center justify-center gap-2 cursor-pointer transition-colors shadow-xs"
+                >
+                  <Camera className="h-4 w-4 text-blue-400" />
+                  <span>Chụp Camera</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => fileInputRef.current?.click()}
+                  className="h-11 sm:h-10 px-3 bg-slate-100 hover:bg-slate-200 active:bg-slate-300 text-slate-800 font-mono font-bold text-xs uppercase tracking-wider rounded border border-slate-300 flex items-center justify-center gap-2 cursor-pointer transition-colors"
+                >
+                  <ImageIcon className="h-4 w-4 text-slate-600" />
+                  <span>Chọn Từ Máy</span>
+                </button>
+
+                {/* Hidden File Inputs */}
+                <input
+                  id="camera-upload"
+                  type="file"
+                  accept="image/*"
+                  capture="environment"
+                  className="hidden"
+                  onChange={handleFileChange}
+                  ref={cameraInputRef}
+                />
                 <input
                   id="file-upload"
                   type="file"
@@ -1311,74 +1771,103 @@ export function QCForm({ user, token, onLogout }: QCFormProps) {
                   onChange={handleFileChange}
                   ref={fileInputRef}
                 />
-              </label>
+              </div>
+
+              {/* Drag and Drop Zone */}
+              <div
+                onClick={() => fileInputRef.current?.click()}
+                className="border-2 border-dashed border-slate-300 hover:border-blue-500 bg-slate-50/70 hover:bg-blue-50/20 cursor-pointer rounded p-5 text-center transition-all shrink-0 select-none"
+              >
+                <div className="flex flex-col items-center justify-center space-y-1">
+                  <UploadCloud className="h-7 w-7 text-slate-400" />
+                  <div className="font-bold text-xs tracking-wider text-slate-700 uppercase font-mono">
+                    Kéo thả ảnh hoặc nhấn để tải lên
+                  </div>
+                  <div className="text-[11px] text-slate-500 font-mono">
+                    Nén tự động chuẩn HD • Tối ưu băng thông mạng nhà máy
+                  </div>
+                </div>
+              </div>
 
               {/* Files grid preview */}
-              {files.length > 0 && (
-                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-3 gap-3 mt-2 overflow-y-auto pr-1 pb-2">
-                  {files.map((file, index) => (
-                    <div key={`${file.name}-${index}`} className="relative group aspect-square bg-slate-100 rounded-lg overflow-hidden border border-slate-200 flex flex-col shadow-sm">
-                      <ImagePreview file={file} index={index} />
-                      <button
-                        type="button"
-                        onClick={() => removeFile(index)}
-                        className="absolute top-1.5 right-1.5 bg-red-600 hover:bg-red-700 text-white rounded-full p-1 shadow-md cursor-pointer border-none flex items-center justify-center z-10"
-                      >
-                        <X className="h-3 w-3" />
-                      </button>
-                    </div>
-                  ))}
+              {files.length > 0 ? (
+                <div className="flex-1 overflow-y-auto min-h-[140px] max-h-[300px]">
+                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5 pr-1 pb-2">
+                    {files.map((file, index) => (
+                      <div key={`${file.name}-${index}`} className="relative group aspect-square bg-slate-900 rounded overflow-hidden border border-slate-200 flex flex-col shadow-xs">
+                        <ImagePreview file={file} index={index} />
+                        <button
+                          type="button"
+                          onClick={() => removeFile(index)}
+                          className="absolute top-1 right-1 bg-red-600 hover:bg-red-700 text-white rounded p-1 shadow cursor-pointer border-none flex items-center justify-center z-10 transition-colors"
+                          title="Xóa ảnh này"
+                        >
+                          <X className="h-3.5 w-3.5" />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              ) : (
+                <div className="flex-1 flex flex-col items-center justify-center py-6 text-center text-slate-400 border border-slate-100 rounded">
+                  <ImageIcon className="h-8 w-8 text-slate-300 mb-1" />
+                  <span className="text-xs font-mono">Chưa có ảnh nào được đính kèm</span>
+                  <span className="text-[10px] text-slate-400 mt-0.5">Yêu cầu tối thiểu 1 ảnh minh chứng lỗi</span>
                 </div>
               )}
 
-              <div className="mt-auto shrink-0 pt-4 flex flex-col gap-3">
+              {/* Submit CTA */}
+              <div className="mt-auto shrink-0 pt-2 flex flex-col gap-2">
                 <button
                   type="submit"
-                  className="bg-blue-600 text-white text-xs py-3.5 px-4 rounded-xl font-extrabold border-none flex w-full items-center justify-center gap-2 transition-transform active:scale-[0.99] shadow-sm cursor-pointer hover:bg-blue-700"
+                  className="bg-blue-600 hover:bg-blue-500 active:bg-blue-700 text-white text-xs py-3.5 px-4 rounded font-mono font-bold uppercase tracking-wider border border-blue-500/50 flex w-full items-center justify-center gap-2 transition-colors shadow-xs cursor-pointer"
                 >
                   <UploadCloud className="h-4.5 w-4.5" />
-                  GỬI BÁO CÁO NGAY
+                  <span>XÁC NHẬN & GỬI BÁO CÁO</span>
                 </button>
               </div>
             </section>
           </form>
         </main>
 
-     <main onScroll={handleScroll} className={`flex-1 overflow-y-auto md:overflow-hidden pt-[64px] md:pt-0 pb-32 md:pb-0 bg-[#F8FAFC] ${activeTab === 'history' ? 'flex flex-col' : 'hidden'}`}>
+     <main onScroll={handleScroll} className={`flex-1 overflow-y-auto md:overflow-hidden pb-24 md:pb-0 bg-slate-100 ${activeTab === 'history' ? 'flex flex-col' : 'hidden'}`}>
         <QCHistory user={user} token={token} userProfile={userProfile} onNavigateToCreate={handleNavigateToCreate} isActive={activeTab === 'history'} />
       </main>
 
       {isAdmin && (
-        <main onScroll={handleScroll} className={`flex-1 overflow-y-auto md:overflow-hidden pt-[64px] md:pt-0 pb-32 md:pb-0 bg-[#F8FAFC] ${activeTab === 'admin' ? 'flex flex-col' : 'hidden'}`}>
+        <main onScroll={handleScroll} className={`flex-1 overflow-y-auto md:overflow-hidden pb-24 md:pb-0 bg-slate-100 ${activeTab === 'admin' ? 'flex flex-col' : 'hidden'}`}>
           <AdminPanel onMappingChange={loadConfiguration} />
         </main>
       )}
 
-      {/* Mobile Bottom Tab Navigation */}
-      <nav className="md:hidden fixed bottom-0 inset-x-0 bg-[#000080] border-t border-white/10 pb-safe h-[52px] flex justify-around items-center z-50 shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.1)]">
+      {/* Industrial Mobile Bottom Navigation Bar */}
+      <nav className="md:hidden fixed bottom-0 inset-x-0 bg-slate-900 border-t border-slate-800 pb-safe h-14 flex items-center justify-around z-50 shadow-lg">
         <button
           type="button"
           onClick={() => setActiveTab('create')}
-          className={`flex items-center justify-center p-2 rounded-full cursor-pointer border-none bg-transparent select-none transition-all ${activeTab === 'create' ? 'text-blue-600 font-extrabold scale-110 bg-blue-50' : 'text-slate-400 hover:text-blue-600'}`}
+          className={`flex-1 h-full flex flex-col items-center justify-center gap-1 cursor-pointer border-none bg-transparent select-none transition-colors ${activeTab === 'create' ? 'text-blue-400 font-bold border-t-2 border-blue-500 -mt-[2px]' : 'text-slate-400 hover:text-slate-200'}`}
         >
-          <PlusCircle className="h-6 w-6" />
+          <PlusCircle className="h-5 w-5" />
+          <span className="text-[10px] font-mono tracking-wider">BÁO CÁO</span>
         </button>
         
         <button
           type="button"
           onClick={() => setActiveTab('history')}
-          className={`flex items-center justify-center p-2 rounded-full cursor-pointer border-none bg-transparent select-none transition-all ${activeTab === 'history' ? 'text-blue-600 font-extrabold scale-110 bg-blue-50' : 'text-slate-400 hover:text-blue-600'}`}
+          className={`flex-1 h-full flex flex-col items-center justify-center gap-1 cursor-pointer border-none bg-transparent select-none transition-colors ${activeTab === 'history' ? 'text-blue-400 font-bold border-t-2 border-blue-500 -mt-[2px]' : 'text-slate-400 hover:text-slate-200'}`}
         >
-          <History className="h-6 w-6" />
+          <History className="h-5 w-5" />
+          <span className="text-[10px] font-mono tracking-wider">LỊCH SỬ</span>
         </button>
         
         {isAdmin && (
           <button
             type="button"
             onClick={() => setActiveTab('admin')}
-            className={`flex items-center justify-center p-2 rounded-full cursor-pointer border-none bg-transparent select-none transition-all ${activeTab === 'admin' ? 'text-blue-600 font-extrabold scale-110 bg-blue-50' : 'text-slate-400 hover:text-blue-600'}`}
+            className={`flex-1 h-full flex flex-col items-center justify-center gap-1 cursor-pointer border-none bg-transparent select-none transition-colors ${activeTab === 'admin' ? 'text-blue-400 font-bold border-t-2 border-blue-500 -mt-[2px]' : 'text-slate-400 hover:text-slate-200'}`}
           >
-            <Settings className="h-6 w-6" />
+            <Settings className="h-5 w-5" />
+            <span className="text-[10px] font-mono tracking-wider">QUẢN TRỊ</span>
           </button>
         )}
       </nav>
@@ -1420,6 +1909,100 @@ export function QCForm({ user, token, onLogout }: QCFormProps) {
               </div>
             </div>
           ))}
+        </div>
+      )}
+
+      {/* Employee Profile Detail Modal (Full Name & Account Specs) */}
+      {showProfileModal && (
+        <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4 animate-in fade-in duration-150">
+          <div className="bg-white rounded-lg border border-slate-300 shadow-2xl max-w-md w-full overflow-hidden animate-in zoom-in-95 duration-150 font-sans">
+            <div className="bg-slate-900 px-4 py-3 border-b border-slate-800 flex items-center justify-between text-white">
+              <div className="flex items-center gap-2">
+                <div className="w-6 h-6 rounded bg-blue-600 flex items-center justify-center text-xs font-mono font-bold">
+                  QC
+                </div>
+                <h3 className="text-xs sm:text-sm font-bold font-mono uppercase tracking-wider text-slate-100">
+                  Thông Tin Nhân Viên QC
+                </h3>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowProfileModal(false)}
+                className="text-slate-400 hover:text-white p-1 rounded hover:bg-slate-800 cursor-pointer transition-colors"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+
+            <div className="p-4 sm:p-5 flex flex-col gap-4 text-xs">
+              <div className="flex items-center gap-3.5 bg-slate-50 border border-slate-200 p-3.5 rounded-lg">
+                <div className="w-12 h-12 rounded-lg bg-blue-600 text-white font-mono font-bold text-lg flex items-center justify-center shrink-0">
+                  {(userProfile?.name || user.email?.split('@')[0] || 'QC').charAt(0).toUpperCase()}
+                </div>
+                <div className="flex flex-col min-w-0">
+                  <span className="text-[11px] font-mono uppercase tracking-wider text-slate-500">Họ và Tên Nhân Viên</span>
+                  <span className="text-base font-bold text-slate-900 break-words">
+                    {userProfile?.name || user.email?.split('@')[0]}
+                  </span>
+                  <span className="text-[11px] font-mono text-slate-500 mt-0.5">
+                    Email: <span className="text-slate-700 font-semibold">{user.email}</span>
+                  </span>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-2.5 font-mono">
+                <div className="bg-slate-50 border border-slate-200 rounded p-2.5 flex flex-col">
+                  <span className="text-[10px] text-slate-500 uppercase">Mã Nhân Viên</span>
+                  <span className="text-sm font-bold text-slate-900 mt-0.5">{userProfile?.employeeId || 'QC'}</span>
+                </div>
+                <div className="bg-slate-50 border border-slate-200 rounded p-2.5 flex flex-col">
+                  <span className="text-[10px] text-slate-500 uppercase">Vai Trò Hệ Thống</span>
+                  <span className="text-xs font-bold text-blue-700 mt-0.5 uppercase">
+                    {userProfile?.role === 'admin' ? 'Quản Trị Viên (Admin)' : 'Nhân Viên QC'}
+                  </span>
+                </div>
+                <div className="bg-slate-50 border border-slate-200 rounded p-2.5 flex flex-col">
+                  <span className="text-[10px] text-slate-500 uppercase">Bộ Vị Đang Chọn</span>
+                  <span className="text-xs font-bold text-slate-900 mt-0.5">{currentPart || userProfile?.part || 'Chưa chọn'}</span>
+                </div>
+                <div className="bg-slate-50 border border-slate-200 rounded p-2.5 flex flex-col">
+                  <span className="text-[10px] text-slate-500 uppercase">Tổ / Khu Vực</span>
+                  <span className="text-xs font-bold text-slate-900 mt-0.5">{userProfile?.floorGroup || 'Mặc định'}</span>
+                </div>
+              </div>
+
+              {userProfile?.permittedFloors && userProfile.permittedFloors.length > 0 && (
+                <div className="bg-slate-50 border border-slate-200 rounded p-2.5 flex flex-col gap-1 font-mono">
+                  <span className="text-[10px] text-slate-500 uppercase">Lầu Được Phép Báo Cáo</span>
+                  <div className="flex flex-wrap gap-1 mt-0.5">
+                    {userProfile.permittedFloors.map(f => (
+                      <span key={f} className="bg-white border border-slate-300 text-slate-700 px-2 py-0.5 rounded text-[11px] font-bold">
+                        {f}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              <div className="flex items-center justify-between pt-2 border-t border-slate-200">
+                <button
+                  type="button"
+                  onClick={handleLogout}
+                  className="px-3 py-2 bg-red-50 hover:bg-red-100 text-red-700 border border-red-200 rounded font-mono font-bold text-xs flex items-center gap-1.5 cursor-pointer transition-colors"
+                >
+                  <LogOut className="h-3.5 w-3.5" />
+                  ĐĂNG XUẤT
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setShowProfileModal(false)}
+                  className="px-4 py-2 bg-slate-900 hover:bg-slate-800 text-white rounded font-mono font-bold text-xs cursor-pointer transition-colors"
+                >
+                  ĐÓNG
+                </button>
+              </div>
+            </div>
+          </div>
         </div>
       )}
       </>

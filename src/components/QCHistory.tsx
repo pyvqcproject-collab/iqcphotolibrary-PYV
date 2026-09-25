@@ -50,6 +50,8 @@ interface QCReport {
   shoeModel?: string;
   colorCode: string;
   errorName: string;
+  errorNames?: string[];
+  imageErrors?: string[];
   supplier: string;
   imageUrls: string[];
   employeeId: string;
@@ -641,6 +643,13 @@ export const QCHistory = React.memo(function QCHistory({ user, token, userProfil
         
         for (let i = 0; i < report.imageUrls.length; i++) {
            const url = report.imageUrls[i];
+           const currentError = (report.imageErrors && report.imageErrors[i])
+             ? report.imageErrors[i]
+             : (report.errorNames && report.errorNames[i])
+               ? report.errorNames[i]
+               : report.errorName;
+           const safeImgError = sanitizeName(currentError);
+           const namePrefix = `${partPrefix}_${safeOrder}_${safeColor}_${safeImgError}_${safeSupplier}_${safeFloor}`;
            let base64 = await getBase64ImageFromUrl(url);
            if (base64) {
               const base64Data = base64.replace(/^data:image\/(png|jpeg|jpg);base64,/, "");
@@ -701,7 +710,12 @@ export const QCHistory = React.memo(function QCHistory({ user, token, userProfil
     const safeOrder = sanitizeName(selectedReport.order);
     const safeModel = selectedReport.shoeModel ? sanitizeName(selectedReport.shoeModel) : '';
     const safeColor = sanitizeName(selectedReport.colorCode);
-    const safeError = sanitizeName(selectedReport.errorName);
+    const currentError = (selectedReport.imageErrors && selectedReport.imageErrors[activeDetailImageIndex])
+      ? selectedReport.imageErrors[activeDetailImageIndex]
+      : (selectedReport.errorNames && selectedReport.errorNames[activeDetailImageIndex])
+        ? selectedReport.errorNames[activeDetailImageIndex]
+        : selectedReport.errorName;
+    const safeError = sanitizeName(currentError);
     const safeSupplier = sanitizeName(selectedReport.supplier);
     const safeFloor = sanitizeName(selectedReport.floor);
     const partPrefix = safeSubPart ? `${safePart}_${safeSubPart}` : safePart;
@@ -731,14 +745,41 @@ export const QCHistory = React.memo(function QCHistory({ user, token, userProfil
       const safeOrder = sanitizeName(selectedReport.order);
       const safeModel = selectedReport.shoeModel ? sanitizeName(selectedReport.shoeModel) : '';
       const safeColor = sanitizeName(selectedReport.colorCode);
-      const safeError = sanitizeName(selectedReport.errorName);
       const safeSupplier = sanitizeName(selectedReport.supplier);
       const safeFloor = sanitizeName(selectedReport.floor);
       const partPrefix = safeSubPart ? `${safePart}_${safeSubPart}` : safePart;
       const modelPrefix = safeModel ? `${safeModel}_` : '';
-      const namePrefix = `${partPrefix}_${safeOrder}_${modelPrefix}${safeColor}_${safeError}_${safeSupplier}_${safeFloor}`;
 
-      await downloadImageUrls(selectedReport.imageUrls, namePrefix);
+      if (selectedReport.imageUrls.length === 1) {
+        const currentError = (selectedReport.imageErrors && selectedReport.imageErrors[0])
+          ? selectedReport.imageErrors[0]
+          : (selectedReport.errorNames && selectedReport.errorNames[0])
+            ? selectedReport.errorNames[0]
+            : selectedReport.errorName;
+        const safeError = sanitizeName(currentError);
+        const namePrefix = `${partPrefix}_${safeOrder}_${modelPrefix}${safeColor}_${safeError}_${safeSupplier}_${safeFloor}`;
+        const actualDownloadUrl = loadedImageUrls[0] || selectedReport.imageUrls[0];
+        await downloadImage(actualDownloadUrl, 0, namePrefix);
+      } else {
+        const zip = new JSZip();
+        for (let i = 0; i < selectedReport.imageUrls.length; i++) {
+          const url = selectedReport.imageUrls[i];
+          const currentError = (selectedReport.imageErrors && selectedReport.imageErrors[i])
+            ? selectedReport.imageErrors[i]
+            : (selectedReport.errorNames && selectedReport.errorNames[i])
+              ? selectedReport.errorNames[i]
+              : selectedReport.errorName;
+          const safeError = sanitizeName(currentError);
+          const namePrefix = `${partPrefix}_${safeOrder}_${modelPrefix}${safeColor}_${safeError}_${safeSupplier}_${safeFloor}`;
+          let base64 = await getBase64ImageFromUrl(url);
+          if (base64) {
+             const base64Data = base64.replace(/^data:image\/(png|jpeg|jpg);base64,/, "");
+             zip.file(`${namePrefix}_${i + 1}.jpg`, base64Data, {base64: true});
+          }
+        }
+        const content = await zip.generateAsync({type: "blob"});
+        saveAs(content, `${partPrefix}_${safeOrder}_${modelPrefix}${safeColor}_Images.zip`);
+      }
     } catch (e: any) {
       console.error(e);
       alert("Lỗi tải ảnh: " + e.message);
@@ -813,6 +854,10 @@ export const QCHistory = React.memo(function QCHistory({ user, token, userProfil
         
         querySnapshot.forEach((doc) => {
           const data = doc.data();
+          const docErrorNames: string[] = Array.isArray(data.errorNames)
+            ? data.errorNames
+            : (data.errorName ? data.errorName.split(',').map((s: string) => s.trim()).filter(Boolean) : []);
+
           onlineReports.push({
             id: doc.id,
             date: data.date,
@@ -820,7 +865,9 @@ export const QCHistory = React.memo(function QCHistory({ user, token, userProfil
             order: data.order,
             shoeModel: data.shoeModel || '',
             colorCode: data.colorCode,
-            errorName: data.errorName,
+            errorName: data.errorName || docErrorNames.join(', '),
+            errorNames: docErrorNames,
+            imageErrors: Array.isArray(data.imageErrors) ? data.imageErrors : [],
             supplier: data.supplier,
             imageUrls: data.imageUrls || [],
             employeeId: data.employeeId,
@@ -1012,6 +1059,8 @@ export const QCHistory = React.memo(function QCHistory({ user, token, userProfil
         shoeModel: report.shoeModel || '',
         colorCode: report.colorCode || '',
         errorName: report.errorName || '',
+        errorNames: report.errorNames || (report.errorName ? report.errorName.split(',').map(s => s.trim()).filter(Boolean) : []),
+        imageErrors: report.imageErrors || [],
         supplier: report.supplier || '',
         part: report.part || '',
         subPart: report.subPart || '',
@@ -1413,6 +1462,11 @@ export const QCHistory = React.memo(function QCHistory({ user, token, userProfil
                         <h3 className="text-sm font-bold text-slate-900 leading-tight">
                           {report.errorName || 'Chưa phân loại lỗi'}
                         </h3>
+                        {report.errorNames && report.errorNames.length > 1 && (
+                          <span className="text-[10px] font-mono font-bold text-red-700 bg-red-50 border border-red-200 px-1.5 py-0.2 rounded">
+                            {report.errorNames.length} LỖI
+                          </span>
+                        )}
                         {report.isLocalOnly ? (
                           <span className="text-[10px] font-mono font-bold text-amber-700 bg-amber-50 px-1.5 py-0.5 rounded border border-amber-200 flex items-center gap-1">
                             <CloudOff className="h-3 w-3" /> LƯU TẠM
@@ -1433,9 +1487,19 @@ export const QCHistory = React.memo(function QCHistory({ user, token, userProfil
                             {report.subPart}
                           </span>
                         )}
-                        <span className="font-bold text-slate-800 bg-slate-100 px-2 py-0.5 rounded border border-slate-200">
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            if (report.order && report.order !== 'Không' && report.order !== 'N/A') {
+                              setSearchQuery(report.order);
+                            }
+                          }}
+                          className="font-bold text-slate-800 bg-slate-100 hover:bg-blue-100 hover:text-blue-800 px-2 py-0.5 rounded border border-slate-200 cursor-pointer transition-colors"
+                          title="Bấm để lọc tất cả lỗi của đơn hàng PO này"
+                        >
                           PO: {report.order || 'N/A'}
-                        </span>
+                        </button>
                         {report.shoeModel && (
                           <span className="font-bold text-teal-800 bg-teal-50 px-2 py-0.5 rounded border border-teal-200">
                             HT: {report.shoeModel}
@@ -1516,7 +1580,16 @@ export const QCHistory = React.memo(function QCHistory({ user, token, userProfil
                       <span className="text-emerald-400 flex items-center gap-1"><CheckCircle className="h-3 w-3" /> ĐÃ LƯU TRỰC TUYẾN</span>
                     )}
                   </div>
-                  <h3 className="text-sm font-bold truncate leading-tight font-mono">{selectedReport.errorName}</h3>
+                  <h3 className="text-sm font-bold leading-tight font-mono break-words">{selectedReport.errorName}</h3>
+                  {selectedReport.errorNames && selectedReport.errorNames.length > 1 && (
+                    <div className="flex flex-wrap gap-1 mt-1">
+                      {selectedReport.errorNames.map((e, idx) => (
+                        <span key={idx} className="text-[10px] font-mono font-bold bg-blue-900/60 text-blue-200 border border-blue-500/40 px-1.5 py-0.2 rounded">
+                          {idx + 1}. {e}
+                        </span>
+                      ))}
+                    </div>
+                  )}
                 </div>
                 <button 
                   onClick={() => setSelectedReport(null)}
@@ -1827,6 +1900,18 @@ export const QCHistory = React.memo(function QCHistory({ user, token, userProfil
                         <span className="text-slate-500 uppercase">Thành Phần Nhỏ:</span>
                         <span className="font-bold text-blue-700">{selectedReport.subPart || 'N/A'}</span>
                       </div>
+                      {selectedReport.errorNames && selectedReport.errorNames.length > 1 && (
+                        <div className="flex flex-col gap-1.5 py-1.5 border-b border-slate-100">
+                          <span className="text-slate-500 uppercase text-[10px]">Danh sách các lỗi ({selectedReport.errorNames.length}):</span>
+                          <div className="flex flex-wrap gap-1">
+                            {selectedReport.errorNames.map((err, i) => (
+                              <span key={i} className="text-xs font-semibold font-mono text-red-800 bg-red-50 border border-red-200 px-2 py-0.5 rounded">
+                                {i + 1}. {err}
+                              </span>
+                            ))}
+                          </div>
+                        </div>
+                      )}
                       <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center py-1.5 border-b border-slate-100 gap-1">
                         <span className="text-slate-500 uppercase shrink-0">QC Phụ Trách:</span>
                         <div className="text-left sm:text-right">
@@ -1913,52 +1998,81 @@ export const QCHistory = React.memo(function QCHistory({ user, token, userProfil
                       {/* Small Carousel Thumb Row selector if report contains more than 1 image */}
                       {selectedReport.imageUrls.length > 1 && (
                         <div className="flex items-center gap-2 overflow-x-auto pb-1.5 max-w-full scrollbar-thin">
-                          {selectedReport.imageUrls.map((url, i) => (
-                            <button
-                              key={i}
-                              type="button"
-                              onClick={() => setActiveDetailImageIndex(i)}
-                              className={`relative h-14 w-14 rounded-lg bg-slate-100 overflow-hidden flex-shrink-0 cursor-pointer transition-all border-2 outline-none ${activeDetailImageIndex === i ? 'border-blue-600 ring-2 ring-blue-500/20 scale-95' : 'border-slate-100 hover:border-slate-350 opacity-70 hover:opacity-100'}`}
-                            >
-                              <DriveImage 
-                                url={url} 
-                                token={token} 
-                                className="w-full h-full object-cover" 
-                                alt={`Thumb ${i}`} 
-                                onLoaded={(objectUrl) => setLoadedImageUrls(prev => ({...prev, [i]: objectUrl}))}
-                              />
-                            </button>
-                          ))}
+                          {selectedReport.imageUrls.map((url, i) => {
+                            const thumbError = (selectedReport.imageErrors && selectedReport.imageErrors[i])
+                              ? selectedReport.imageErrors[i]
+                              : (selectedReport.errorNames && selectedReport.errorNames[i])
+                                ? selectedReport.errorNames[i]
+                                : selectedReport.errorName;
+                            return (
+                              <button
+                                key={i}
+                                type="button"
+                                onClick={() => setActiveDetailImageIndex(i)}
+                                className={`relative h-16 w-16 rounded-lg bg-slate-100 overflow-hidden flex-shrink-0 cursor-pointer transition-all border-2 outline-none flex flex-col ${activeDetailImageIndex === i ? 'border-blue-600 ring-2 ring-blue-500/20 scale-95' : 'border-slate-100 hover:border-slate-350 opacity-75 hover:opacity-100'}`}
+                                title={`Ảnh #${i + 1}: ${thumbError}`}
+                              >
+                                <DriveImage 
+                                  url={url} 
+                                  token={token} 
+                                  className="w-full h-full object-cover" 
+                                  alt={`Thumb ${i}`} 
+                                  onLoaded={(objectUrl) => setLoadedImageUrls(prev => ({...prev, [i]: objectUrl}))}
+                                />
+                                <div className="absolute inset-x-0 bottom-0 bg-black/80 px-1 py-0.5 text-center pointer-events-none">
+                                  <span className="text-[9px] font-mono text-white font-bold truncate block">
+                                    {thumbError}
+                                  </span>
+                                </div>
+                              </button>
+                            );
+                          })}
                         </div>
                       )}
 
-                      {/* Action buttons under active image */}
-                      <div className="pt-2 flex items-center justify-between text-xs gap-2 border-t border-slate-50 mt-1">
-                        <span className="text-slate-450 font-mono text-[10px] truncate max-w-[120px]" title={selectedReport.imageUrls[activeDetailImageIndex]}>
-                          Ảnh {activeDetailImageIndex + 1}: {selectedReport.imageUrls[activeDetailImageIndex]?.split('?')[0].split('/').pop() || 'Drive File'}
-                        </span>
-                        
-                        <div className="flex items-center gap-3">
-                          <button
-                            onClick={handleDownloadActiveImage}
-                            disabled={!loadedImageUrls[activeDetailImageIndex]}
-                            className="text-[11px] text-green-600 hover:text-green-800 font-bold flex items-center gap-1 hover:underline transition-colors cursor-pointer shrink-0 disabled:opacity-50"
-                            title="Tải ảnh về máy"
-                          >
-                            <span>Tải xuống</span>
-                            <Download className="h-3.5 w-3.5" />
-                          </button>
-                          <a 
-                            href={selectedReport.imageUrls[activeDetailImageIndex]} 
-                            target="_blank" 
-                            rel="noreferrer noopener"
-                            className="text-[11px] text-blue-600 hover:text-blue-800 font-bold flex items-center gap-1 hover:underline transition-colors cursor-pointer shrink-0"
-                          >
-                            <span>Mở HD</span>
-                            <ExternalLink className="h-3.5 w-3.5" />
-                          </a>
-                        </div>
-                      </div>
+                      {/* Ghi chú tên lỗi bên dưới hình */}
+                      {(() => {
+                        const activeDefectName = (selectedReport.imageErrors && selectedReport.imageErrors[activeDetailImageIndex])
+                          ? selectedReport.imageErrors[activeDetailImageIndex]
+                          : (selectedReport.errorNames && selectedReport.errorNames[activeDetailImageIndex])
+                            ? selectedReport.errorNames[activeDetailImageIndex]
+                            : selectedReport.errorName;
+
+                        return (
+                          <div className="p-2.5 bg-slate-50 border border-slate-200 rounded-lg flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 mt-2">
+                            <div className="flex items-center gap-2 min-w-0">
+                              <span className="text-[10px] font-mono font-bold text-red-600 uppercase flex items-center gap-1 shrink-0 bg-red-50 border border-red-200 px-1.5 py-0.5 rounded">
+                                <span className="w-1.5 h-1.5 rounded-full bg-red-600 shrink-0"></span>
+                                LỖI ẢNH #{activeDetailImageIndex + 1}:
+                              </span>
+                              <span className="text-xs font-mono font-bold text-slate-800 break-words" title={activeDefectName}>
+                                {activeDefectName || 'Lỗi chung'}
+                              </span>
+                            </div>
+
+                            <div className="flex items-center gap-2 text-xs shrink-0 self-end sm:self-auto">
+                              <button
+                                onClick={handleDownloadActiveImage}
+                                disabled={!loadedImageUrls[activeDetailImageIndex]}
+                                className="text-[11px] text-green-700 hover:text-green-800 font-bold font-mono flex items-center gap-1 px-2.5 py-1 bg-white hover:bg-green-50 border border-green-300 rounded shadow-2xs transition-colors cursor-pointer disabled:opacity-50"
+                                title="Tải ảnh này về máy (đặt tên theo lỗi)"
+                              >
+                                <Download className="h-3.5 w-3.5" />
+                                <span>Tải xuống</span>
+                              </button>
+                              <a 
+                                href={selectedReport.imageUrls[activeDetailImageIndex]} 
+                                target="_blank" 
+                                rel="noreferrer noopener"
+                                className="text-[11px] text-blue-700 hover:text-blue-900 font-bold font-mono flex items-center gap-1 px-2.5 py-1 bg-white hover:bg-blue-50 border border-blue-300 rounded shadow-2xs transition-colors cursor-pointer"
+                              >
+                                <span>Mở HD</span>
+                                <ExternalLink className="h-3.5 w-3.5" />
+                              </a>
+                            </div>
+                          </div>
+                        );
+                      })()}
                     </div>
                   )}
                 </div>
@@ -2011,9 +2125,24 @@ export const QCHistory = React.memo(function QCHistory({ user, token, userProfil
         >
           {/* Top header */}
           <div className="absolute top-4 left-4 right-4 flex items-center justify-between text-white z-10">
-            <span className="text-xs font-mono bg-white/10 px-3 py-1.5 rounded-full backdrop-blur">
-              PO: <span className="font-bold">{selectedReport.order}</span> / Hình {lightboxIndex + 1} trên {selectedReport.imageUrls.length}
-            </span>
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="text-xs font-mono bg-white/10 px-3 py-1.5 rounded-full backdrop-blur">
+                PO: <span className="font-bold">{selectedReport.order}</span> / Hình {lightboxIndex + 1} trên {selectedReport.imageUrls.length}
+              </span>
+              {(() => {
+                const lbDefect = (selectedReport.imageErrors && selectedReport.imageErrors[lightboxIndex])
+                  ? selectedReport.imageErrors[lightboxIndex]
+                  : (selectedReport.errorNames && selectedReport.errorNames[lightboxIndex])
+                    ? selectedReport.errorNames[lightboxIndex]
+                    : selectedReport.errorName;
+                return lbDefect ? (
+                  <span className="text-xs font-mono bg-red-600/90 text-white px-3 py-1.5 rounded-full backdrop-blur font-bold flex items-center gap-1 shadow-sm">
+                    <span>Lỗi:</span>
+                    <span>{lbDefect}</span>
+                  </span>
+                ) : null;
+              })()}
+            </div>
             <button 
               onClick={(e) => { e.stopPropagation(); setLightboxIndex(null); }}
               className="p-2 cursor-pointer bg-white/10 hover:bg-white/20 text-white rounded-full transition-colors outline-none"
@@ -2062,7 +2191,19 @@ export const QCHistory = React.memo(function QCHistory({ user, token, userProfil
           </div>
 
           {/* Bottom link to open original link */}
-          <div className="absolute bottom-6 left-4 right-4 flex justify-center gap-4 z-10" onClick={(e) => e.stopPropagation()}>
+          <div className="absolute bottom-6 left-4 right-4 flex flex-col items-center gap-2 z-10" onClick={(e) => e.stopPropagation()}>
+            {(() => {
+              const lbDefect = (selectedReport.imageErrors && selectedReport.imageErrors[lightboxIndex])
+                ? selectedReport.imageErrors[lightboxIndex]
+                : (selectedReport.errorNames && selectedReport.errorNames[lightboxIndex])
+                  ? selectedReport.errorNames[lightboxIndex]
+                  : selectedReport.errorName;
+              return lbDefect ? (
+                <div className="text-xs font-mono font-bold text-white bg-black/75 px-3.5 py-1 rounded-full border border-white/20 backdrop-blur">
+                  Ghi chú lỗi: {lbDefect}
+                </div>
+              ) : null;
+            })()}
             <a 
               href={selectedReport.imageUrls[lightboxIndex]} 
               target="_blank" 

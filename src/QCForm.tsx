@@ -1289,7 +1289,7 @@ export function QCForm({ user, token, onLogout }: QCFormProps) {
                     }}
                     className="w-full h-11 sm:h-10 px-3 bg-white border border-slate-300 rounded hover:border-slate-400 focus:bg-white focus:ring-1 focus:ring-blue-600 focus:border-blue-600 outline-none transition-all font-bold text-slate-900 text-sm cursor-pointer"
                   >
-                    <option value="" disabled>-- Chọn bộ vị * --</option>
+                    <option value="" disabled>-- Chọn thành phần nhỏ * --</option>
                     {subPartOptions.map(sp => (
                       <option key={sp} value={sp}>{sp}</option>
                     ))}

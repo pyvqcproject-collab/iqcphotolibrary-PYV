@@ -41,6 +41,7 @@ import { format, parseISO } from 'date-fns';
 import * as ExcelJS from 'exceljs';
 import { saveAs } from 'file-saver';
 import JSZip from 'jszip';
+import { ZaloShareModal, ZaloIcon, ZaloShareReportData } from './ZaloShareModal';
 
 interface QCReport {
   id: string;
@@ -225,6 +226,7 @@ export const QCHistory = React.memo(function QCHistory({ user, token, userProfil
   const [activeDetailImageIndex, setActiveDetailImageIndex] = useState<number>(0);
   const [lightboxIndex, setLightboxIndex] = useState<number | null>(null);
   const [loadedImageUrls, setLoadedImageUrls] = useState<Record<number, string>>({});
+  const [zaloReport, setZaloReport] = useState<ZaloShareReportData | null>(null);
 
   // Admin capability check
   const isAdmin = useMemo(() => {
@@ -1554,6 +1556,18 @@ export const QCHistory = React.memo(function QCHistory({ user, token, userProfil
                         Đồng bộ
                       </button>
                     )}
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setZaloReport(report);
+                      }}
+                      className="p-1.5 rounded-md text-[#0068FF] bg-blue-50/70 hover:bg-[#0068FF] hover:text-white border border-blue-200 hover:border-[#0068FF] transition-all cursor-pointer flex items-center gap-1 text-[11px] font-mono font-bold shrink-0 shadow-2xs"
+                      title="Chia sẻ báo cáo đơn hàng này sang Zalo"
+                    >
+                      <ZaloIcon className="h-3.5 w-3.5" />
+                      <span className="hidden sm:inline">Zalo</span>
+                    </button>
                     <ChevronRight className="h-4 w-4 text-slate-400 hidden sm:block" />
                   </div>
                 </div>
@@ -1607,6 +1621,19 @@ export const QCHistory = React.memo(function QCHistory({ user, token, userProfil
                     <AlertCircle className="h-4.5 w-4.5 text-red-500 shrink-0 mt-0.5" />
                     <span>{adminActionError}</span>
                   </div>
+                )}
+
+                {/* Zalo Share Action Button */}
+                {!isEditing && (
+                  <button
+                    type="button"
+                    onClick={() => setZaloReport(selectedReport)}
+                    className="w-full bg-[#0068FF] hover:bg-[#0055d4] active:bg-[#0047b3] text-white font-extrabold text-xs py-2.5 px-4 rounded-xl flex items-center justify-center gap-2 shadow-sm hover:shadow transition-all cursor-pointer border-none"
+                    title="Chia sẻ báo cáo chất lượng và hình ảnh sang Zalo"
+                  >
+                    <ZaloIcon className="h-4 w-4" />
+                    <span>CHIA SẺ BÁO CÁO SANG ZALO</span>
+                  </button>
                 )}
 
                 {/* Edit & Delete Controls Panel */}
@@ -2215,6 +2242,15 @@ export const QCHistory = React.memo(function QCHistory({ user, token, userProfil
             </a>
           </div>
         </div>
+      )}
+
+      {/* Zalo Share Modal */}
+      {zaloReport && (
+        <ZaloShareModal 
+          report={zaloReport} 
+          onClose={() => setZaloReport(null)} 
+          token={token} 
+        />
       )}
     </div>
   );

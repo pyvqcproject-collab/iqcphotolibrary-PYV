@@ -694,6 +694,25 @@ export function QCForm({ user, token, onLogout }: QCFormProps) {
     loadConfiguration();
   }, [user.email]);
 
+  // Preload last submitted report for instant Zalo sharing on web reload
+  useEffect(() => {
+    try {
+      const savedMeta = localStorage.getItem('last_zalo_report_meta');
+      if (savedMeta) {
+        setLastSubmittedReport(JSON.parse(savedMeta));
+      } else {
+        const localReports = JSON.parse(localStorage.getItem('local_qc_reports') || '[]');
+        if (Array.isArray(localReports) && localReports.length > 0) {
+          const latest = localReports[localReports.length - 1];
+          setLastSubmittedReport({
+            ...latest,
+            imageUrls: latest.imageUrls || []
+          });
+        }
+      }
+    } catch (e) {}
+  }, []);
+
   // Adjust floor state if floor options change or exclude current selection
   useEffect(() => {
     if (floorOptions.length > 0 && !floorOptions.includes(floor)) {
@@ -1065,7 +1084,7 @@ export function QCForm({ user, token, onLogout }: QCFormProps) {
     });
 
     // Save report data for Zalo sharing
-    setLastSubmittedReport({
+    const newZaloReport: ZaloShareReportData = {
       order: order.trim(),
       shoeModel: effectiveModel,
       colorCode: effectiveColor,
@@ -1082,7 +1101,14 @@ export function QCForm({ user, token, onLogout }: QCFormProps) {
       employeeId: userProfile?.employeeId || user.email?.split('@')[0] || 'Unknown',
       note: note.trim() || undefined,
       imageFiles: reportFiles
-    });
+    };
+    setLastSubmittedReport(newZaloReport);
+    try {
+      localStorage.setItem('last_zalo_report_meta', JSON.stringify({
+        ...newZaloReport,
+        imageFiles: undefined
+      }));
+    } catch (e) {}
 
     // Reset form: respect keepOrderInfo
     if (keepOrderInfo) {
@@ -1120,6 +1146,85 @@ export function QCForm({ user, token, onLogout }: QCFormProps) {
 
     // Run async upload without blocking
     processBackgroundReport(taskId, taskTitle, reportFiles, reportPayloadBase);
+  };
+
+  /**
+   * Chia sẻ tức thời thông tin đơn hàng và hình ảnh hiện tại sang Zalo
+   * Hoạt động mọi lúc: ngay khi nhập liệu, trước khi gửi, hoặc gửi lại đơn hàng gần nhất
+   */
+  const handleShareCurrentToZalo = () => {
+    // 1. Nếu form hiện tại đang có ảnh minh chứng HOẶC có số PO
+    if (defectPhotos.length > 0 || (order && order.trim())) {
+      const finalPart = currentPart || 'ĐẾ THÔ';
+      const effectiveModel = shoeModel.trim() || undefined;
+      const effectiveColor = colorCode.trim() || '';
+      const finalErrors = selectedErrors.length > 0 
+        ? selectedErrors 
+        : (errorName.trim() ? [errorName.trim()] : ['Chưa phân loại lỗi']);
+      const finalSupplier = supplier.trim() || '';
+      const finalFloor = floor.trim() || '';
+
+      const reportFiles = defectPhotos.map(p => p.file);
+      const reportImageErrors = defectPhotos.map(p => p.errorName || finalErrors[0]);
+
+      const formReportData: ZaloShareReportData = {
+        order: order.trim() || (isNoPo ? 'Không có PO' : 'Báo cáo QC'),
+        shoeModel: effectiveModel.trim() || undefined,
+        colorCode: effectiveColor.trim() || '',
+        errorName: finalErrors[0] || 'Lỗi',
+        errorNames: finalErrors,
+        imageErrors: reportImageErrors,
+        supplier: finalSupplier.trim(),
+        floor: finalFloor.trim(),
+        part: finalPart,
+        subPart: subPart.trim() || undefined,
+        date: date || new Date().toISOString().split('T')[0],
+        createdAt: new Date(),
+        employeeName: userProfile?.name || '',
+        employeeId: userProfile?.employeeId || user.email?.split('@')[0] || 'QC',
+        note: note.trim() || undefined,
+        imageFiles: reportFiles
+      };
+
+      setZaloReport(formReportData);
+      return;
+    }
+
+    // 2. Nếu form đang trống nhưng đã có đơn hàng vừa gửi
+    if (lastSubmittedReport) {
+      setZaloReport(lastSubmittedReport);
+      return;
+    }
+
+    // 3. Kiểm tra xem có báo cáo lưu trong localStorage không
+    try {
+      const localReports = JSON.parse(localStorage.getItem('local_qc_reports') || '[]');
+      if (Array.isArray(localReports) && localReports.length > 0) {
+        const latest = localReports[localReports.length - 1];
+        setZaloReport({
+          ...latest,
+          imageUrls: latest.imageUrls || []
+        });
+        return;
+      }
+    } catch (e) {}
+
+    // 4. Mẫu báo cáo mặc định để người dùng xem và điền thêm
+    setZaloReport({
+      order: isNoPo ? 'Không có PO' : 'Báo cáo QC',
+      shoeModel: shoeModel || undefined,
+      colorCode: colorCode || '',
+      errorName: 'Chưa phân loại lỗi',
+      errorNames: [],
+      supplier: supplier || '',
+      floor: floor || '',
+      part: currentPart || 'ĐẾ THÔ',
+      date: date || new Date().toISOString().split('T')[0],
+      createdAt: new Date(),
+      employeeName: userProfile?.name || '',
+      employeeId: userProfile?.employeeId || user.email?.split('@')[0] || 'QC',
+      imageFiles: []
+    });
   };
 
   const processBackgroundReport = async (taskId: string, title: string, reportFiles: File[], reportPayloadBase: any) => {
@@ -1342,6 +1447,16 @@ export function QCForm({ user, token, onLogout }: QCFormProps) {
               </button>
             )}
           </nav>
+
+          <button
+            type="button"
+            onClick={handleShareCurrentToZalo}
+            className="hidden md:flex items-center gap-1.5 bg-[#0068FF] hover:bg-[#0055d4] active:bg-[#0047b3] text-white text-xs font-mono font-bold py-1.5 px-3 rounded-md shadow-xs cursor-pointer transition-colors border border-blue-400/30"
+            title="Mở bảng chia sẻ thông tin đơn hàng và hình ảnh sang Zalo"
+          >
+            <ZaloIcon className="h-4 w-4" />
+            <span>CHIA SẺ ZALO</span>
+          </button>
         </div>
 
         <div className="flex items-center gap-2 sm:gap-4 min-w-0">
@@ -2050,9 +2165,20 @@ export function QCForm({ user, token, onLogout }: QCFormProps) {
                   <span className="w-5 h-5 rounded bg-slate-900 text-white font-mono text-xs flex items-center justify-center font-bold">02</span>
                   <h2 className="m-0 text-xs sm:text-sm font-bold text-slate-900 font-mono uppercase tracking-wider">Minh Chứng Hình Ảnh Lỗi</h2>
                 </div>
-                <span className="text-[11px] font-mono text-slate-500 font-bold">
-                  {defectPhotos.length} ẢNH
-                </span>
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={handleShareCurrentToZalo}
+                    className="text-xs font-mono font-bold text-white bg-[#0068FF] hover:bg-[#0055d4] active:bg-[#0047b3] px-2.5 py-1 rounded flex items-center gap-1.5 shadow-2xs transition-colors cursor-pointer"
+                    title="Chia sẻ nhanh thông tin đơn hàng và ảnh sang Zalo"
+                  >
+                    <ZaloIcon className="h-3.5 w-3.5" />
+                    <span>CHIA SẺ ZALO</span>
+                  </button>
+                  <span className="text-[11px] font-mono text-slate-600 font-bold bg-slate-100 px-2 py-0.5 rounded border border-slate-200">
+                    {defectPhotos.length} ẢNH
+                  </span>
+                </div>
               </div>
 
               {success && (
@@ -2277,15 +2403,44 @@ export function QCForm({ user, token, onLogout }: QCFormProps) {
                 </div>
               )}
 
-              {/* Submit CTA */}
-              <div className="mt-auto shrink-0 pt-2 flex flex-col gap-2">
-                <button
-                  type="submit"
-                  className="bg-blue-600 hover:bg-blue-500 active:bg-blue-700 text-white text-xs py-3.5 px-4 rounded font-mono font-bold uppercase tracking-wider border border-blue-500/50 flex w-full items-center justify-center gap-2 transition-colors shadow-xs cursor-pointer"
-                >
-                  <UploadCloud className="h-4.5 w-4.5" />
-                  <span>XÁC NHẬN & GỬI BÁO CÁO</span>
-                </button>
+              {/* Submit & Zalo Share CTA */}
+              <div className="mt-auto shrink-0 pt-3 flex flex-col gap-2.5">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                  <button
+                    type="submit"
+                    className="bg-blue-600 hover:bg-blue-500 active:bg-blue-700 text-white text-xs py-3.5 px-4 rounded font-mono font-bold uppercase tracking-wider border border-blue-500/50 flex items-center justify-center gap-2 transition-colors shadow-xs cursor-pointer"
+                  >
+                    <UploadCloud className="h-4.5 w-4.5" />
+                    <span>XÁC NHẬN & GỬI BÁO CÁO</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={handleShareCurrentToZalo}
+                    className="bg-[#0068FF] hover:bg-[#0055d4] active:bg-[#0047b3] text-white text-xs py-3.5 px-4 rounded font-mono font-bold uppercase tracking-wider border border-blue-600 flex items-center justify-center gap-2 transition-all shadow-xs cursor-pointer"
+                    title="Mở bảng chia sẻ thông tin đơn hàng và hình ảnh sang Zalo"
+                  >
+                    <ZaloIcon className="h-4.5 w-4.5" />
+                    <span>CHIA SẺ SANG ZALO</span>
+                  </button>
+                </div>
+
+                {lastSubmittedReport && (
+                  <div className="p-2.5 bg-blue-50/90 border border-blue-200 rounded flex items-center justify-between gap-2 text-xs">
+                    <span className="text-blue-900 font-mono font-semibold truncate">
+                      Đơn hàng vừa gửi: <strong>PO {lastSubmittedReport.order}</strong> ({lastSubmittedReport.imageFiles?.length || lastSubmittedReport.imageUrls?.length || 0} ảnh)
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => setZaloReport(lastSubmittedReport)}
+                      className="text-xs font-mono font-bold text-white bg-[#0068FF] hover:bg-[#0055d4] px-3 py-1 rounded flex items-center gap-1.5 shrink-0 cursor-pointer shadow-2xs"
+                      title="Mở lại bảng chia sẻ sang Zalo cho báo cáo vừa gửi"
+                    >
+                      <ZaloIcon className="h-3.5 w-3.5" />
+                      <span>GỬI LẠI ZALO</span>
+                    </button>
+                  </div>
+                )}
               </div>
             </section>
           </form>
@@ -2319,6 +2474,16 @@ export function QCForm({ user, token, onLogout }: QCFormProps) {
         >
           <History className="h-5 w-5" />
           <span className="text-[10px] font-mono tracking-wider">LỊCH SỬ</span>
+        </button>
+
+        <button
+          type="button"
+          onClick={handleShareCurrentToZalo}
+          className="flex-1 h-full flex flex-col items-center justify-center gap-1 cursor-pointer border-none bg-transparent select-none transition-colors text-blue-400 hover:text-white"
+          title="Chia sẻ báo cáo sang Zalo"
+        >
+          <ZaloIcon className="h-5 w-5" />
+          <span className="text-[10px] font-mono tracking-wider">ZALO</span>
         </button>
         
         {isAdmin && (

@@ -39,7 +39,7 @@ import {
 } from 'lucide-react';
 import { format, parseISO } from 'date-fns';
 import * as ExcelJS from 'exceljs';
-import { saveAs } from 'file-saver';
+import { saveAs } from '../lib/download';
 import JSZip from 'jszip';
 import { ZaloShareModal, ZaloIcon, ZaloShareReportData } from './ZaloShareModal';
 

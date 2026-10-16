@@ -418,10 +418,16 @@ export function ZaloShareModal({ report, onClose, token }: ZaloShareModalProps) 
     }
   };
 
-  // 5. Mở Zalo Web
+  // 5. Mở Zalo Web an toàn (tránh bị trình duyệt chặn popup trong iframe)
   const handleOpenZaloWeb = () => {
     handleCopyText();
-    window.open('https://chat.zalo.me/', '_blank', 'noopener,noreferrer');
+    const link = document.createElement('a');
+    link.href = 'https://chat.zalo.me/';
+    link.target = '_blank';
+    link.rel = 'noopener noreferrer';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
   };
 
   // 6. Tải toàn bộ ảnh

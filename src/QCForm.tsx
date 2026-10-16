@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect, useCallback, useMemo } from 'react';
 import { User } from 'firebase/auth';
-import { collection, doc, setDoc, getDocs, getDoc, query, serverTimestamp } from 'firebase/firestore';
+import { collection, doc, setDoc, getDocs, getDoc, query, serverTimestamp, orderBy, limit } from 'firebase/firestore';
 import { db } from './lib/firebase';
 import { uploadFileToDrive } from './lib/drive';
 import { uploadFileToStorage } from './lib/storage';
@@ -46,6 +46,7 @@ import {
   DEFAULT_COLORS_LIST
 } from './components/AdminPanel';
 import { ZaloShareModal, ZaloIcon, ZaloShareReportData } from './components/ZaloShareModal';
+import { ZaloShareCenter } from './components/ZaloShareCenter';
 
 export interface DefectPhotoItem {
   id: string;
@@ -163,7 +164,37 @@ export function QCForm({ user, token, onLogout }: QCFormProps) {
     return s.trim().replace(/\s+/g, "_");
   };
 
-  const [activeTab, setActiveTab] = useState<'create' | 'history' | 'admin'>('create');
+  const [activeTab, setActiveTab] = useState<'create' | 'history' | 'admin' | 'zalo'>('create');
+  const [allReportsForZalo, setAllReportsForZalo] = useState<any[]>([]);
+
+  const refreshZaloReports = async () => {
+    try {
+      const localReports: any[] = JSON.parse(localStorage.getItem('local_qc_reports') || '[]');
+      let firestoreReports: any[] = [];
+      try {
+        const q = query(collection(db, 'qc_reports'), orderBy('createdAt', 'desc'), limit(50));
+        const snapshot = await getDocs(q);
+        firestoreReports = snapshot.docs.map(doc => {
+          const data = doc.data();
+          return {
+            id: doc.id,
+            ...data,
+            createdAt: data.createdAt?.toDate ? data.createdAt.toDate().toISOString() : data.createdAt
+          };
+        });
+      } catch (_) {}
+
+      const map = new Map<string, any>();
+      firestoreReports.forEach(r => map.set(r.id, r));
+      localReports.forEach(r => map.set(r.id || `local_${r.createdAt}`, r));
+      const combined = Array.from(map.values()).sort((a, b) => {
+        const timeA = new Date(a.createdAt || a.date || 0).getTime();
+        const timeB = new Date(b.createdAt || b.date || 0).getTime();
+        return timeB - timeA;
+      });
+      setAllReportsForZalo(combined);
+    } catch (_) {}
+  };
   const [date, setDate] = useState(format(new Date(), 'yyyy-MM-dd'));
   const [floor, setFloor] = useState('');
   const [order, setOrder] = useState('');
@@ -1437,6 +1468,17 @@ export function QCForm({ user, token, onLogout }: QCFormProps) {
             >
               LỊCH SỬ QC
             </button>
+            <button
+              type="button"
+              onClick={() => {
+                refreshZaloReports();
+                setActiveTab('zalo');
+              }}
+              className={`px-3 py-1.5 rounded transition-all cursor-pointer font-bold flex items-center gap-1.5 ${activeTab === 'zalo' ? 'bg-[#0068FF] text-white shadow-xs' : 'text-blue-300 hover:text-white hover:bg-slate-700/50'}`}
+            >
+              <ZaloIcon className="h-4 w-4" />
+              <span>CHIA SẺ QUA ZALO</span>
+            </button>
             {isAdmin && (
               <button
                 type="button"
@@ -1450,12 +1492,15 @@ export function QCForm({ user, token, onLogout }: QCFormProps) {
 
           <button
             type="button"
-            onClick={handleShareCurrentToZalo}
+            onClick={() => {
+              refreshZaloReports();
+              setActiveTab('zalo');
+            }}
             className="hidden md:flex items-center gap-1.5 bg-[#0068FF] hover:bg-[#0055d4] active:bg-[#0047b3] text-white text-xs font-mono font-bold py-1.5 px-3 rounded-md shadow-xs cursor-pointer transition-colors border border-blue-400/30"
-            title="Mở bảng chia sẻ thông tin đơn hàng và hình ảnh sang Zalo"
+            title="Mở trung tâm chia sẻ thông tin đơn hàng và hình ảnh sang Zalo"
           >
             <ZaloIcon className="h-4 w-4" />
-            <span>CHIA SẺ ZALO</span>
+            <span>MỞ TRUNG TÂM ZALO</span>
           </button>
         </div>
 
@@ -2450,6 +2495,16 @@ export function QCForm({ user, token, onLogout }: QCFormProps) {
         <QCHistory user={user} token={token} userProfile={userProfile} onNavigateToCreate={handleNavigateToCreate} isActive={activeTab === 'history'} />
       </main>
 
+      <main onScroll={handleScroll} className={`flex-1 overflow-y-auto pb-24 md:pb-0 bg-slate-100 ${activeTab === 'zalo' ? 'flex flex-col' : 'hidden'}`}>
+        <ZaloShareCenter 
+          currentReport={lastSubmittedReport || zaloReport}
+          historyReports={allReportsForZalo}
+          token={token}
+          onNavigateToCreate={() => setActiveTab('create')}
+          onNavigateToHistory={() => setActiveTab('history')}
+        />
+      </main>
+
       {isAdmin && (
         <main onScroll={handleScroll} className={`flex-1 overflow-y-auto md:overflow-hidden pb-24 md:pb-0 bg-slate-100 ${activeTab === 'admin' ? 'flex flex-col' : 'hidden'}`}>
           <AdminPanel onMappingChange={loadConfiguration} />
@@ -2478,9 +2533,12 @@ export function QCForm({ user, token, onLogout }: QCFormProps) {
 
         <button
           type="button"
-          onClick={handleShareCurrentToZalo}
-          className="flex-1 h-full flex flex-col items-center justify-center gap-1 cursor-pointer border-none bg-transparent select-none transition-colors text-blue-400 hover:text-white"
-          title="Chia sẻ báo cáo sang Zalo"
+          onClick={() => {
+            refreshZaloReports();
+            setActiveTab('zalo');
+          }}
+          className={`flex-1 h-full flex flex-col items-center justify-center gap-1 cursor-pointer border-none bg-transparent select-none transition-colors ${activeTab === 'zalo' ? 'text-blue-400 font-bold border-t-2 border-blue-500 -mt-[2px]' : 'text-slate-400 hover:text-slate-200'}`}
+          title="Mở giao diện chia sẻ qua Zalo"
         >
           <ZaloIcon className="h-5 w-5" />
           <span className="text-[10px] font-mono tracking-wider">ZALO</span>

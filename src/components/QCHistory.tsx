@@ -33,15 +33,16 @@ import {
   Trash2,
   Save,
   Undo2,
-  ShieldCheck,
   AlertTriangle,
-  User as UserIcon
+  User as UserIcon,
+  Copy,
+  Check
 } from 'lucide-react';
 import { format, parseISO } from 'date-fns';
 import * as ExcelJS from 'exceljs';
 import { saveAs } from '../lib/download';
 import JSZip from 'jszip';
-import { ZaloShareModal, ZaloIcon, ZaloShareReportData } from './ZaloShareModal';
+import { ZaloShareModal, ZaloIcon, ZaloShareReportData, buildZaloMessage } from './ZaloShareModal';
 
 interface QCReport {
   id: string;
@@ -227,6 +228,7 @@ export const QCHistory = React.memo(function QCHistory({ user, token, userProfil
   const [lightboxIndex, setLightboxIndex] = useState<number | null>(null);
   const [loadedImageUrls, setLoadedImageUrls] = useState<Record<number, string>>({});
   const [zaloReport, setZaloReport] = useState<ZaloShareReportData | null>(null);
+  const [detailCopiedZalo, setDetailCopiedZalo] = useState(false);
 
   // Admin capability check
   const isAdmin = useMemo(() => {
@@ -1644,17 +1646,78 @@ export const QCHistory = React.memo(function QCHistory({ user, token, userProfil
                   </div>
                 )}
 
-                {/* Zalo Share Action Button */}
+                {/* Embedded Zalo Share Section in Detail Pane */}
                 {!isEditing && (
-                  <button
-                    type="button"
-                    onClick={() => setZaloReport(selectedReport)}
-                    className="w-full bg-[#0068FF] hover:bg-[#0055d4] active:bg-[#0047b3] text-white font-extrabold text-xs py-2.5 px-4 rounded-xl flex items-center justify-center gap-2 shadow-sm hover:shadow transition-all cursor-pointer border-none"
-                    title="Chia sẻ báo cáo chất lượng và hình ảnh sang Zalo"
-                  >
-                    <ZaloIcon className="h-4 w-4" />
-                    <span>CHIA SẺ BÁO CÁO SANG ZALO</span>
-                  </button>
+                  <div className="bg-gradient-to-br from-blue-50/90 via-sky-50 to-blue-50/50 border border-blue-200 rounded-xl p-3.5 space-y-2.5 shadow-2xs">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <div className="w-7 h-7 rounded-lg bg-[#0068FF] text-white p-1 flex items-center justify-center shadow-xs">
+                          <ZaloIcon className="h-5 w-5" />
+                        </div>
+                        <div>
+                          <h4 className="text-xs font-bold font-mono text-blue-950 uppercase">
+                            Chia Sẻ Sang Zalo
+                          </h4>
+                          <span className="text-[10px] text-blue-700 font-mono">
+                            PO: {selectedReport.order || 'Không có PO'} • {selectedReport.imageUrls?.length || 0} ảnh
+                          </span>
+                        </div>
+                      </div>
+
+                      <a
+                        href="https://chat.zalo.me/"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-[11px] font-mono font-bold text-white bg-[#0068FF] hover:bg-[#0055d4] px-2.5 py-1 rounded-md flex items-center gap-1 shadow-2xs transition-colors"
+                        title="Mở ứng dụng Zalo Web trên trình duyệt"
+                      >
+                        <ExternalLink className="h-3 w-3" />
+                        <span>Mở Zalo Web</span>
+                      </a>
+                    </div>
+
+                    {/* Pre-formatted message snippet */}
+                    <div className="bg-white/95 border border-blue-200 rounded-lg p-2.5 font-mono text-[11px] text-slate-800 whitespace-pre-wrap leading-relaxed select-all">
+                      {buildZaloMessage(selectedReport)}
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-2 pt-0.5">
+                      <button
+                        type="button"
+                        onClick={async () => {
+                          try {
+                            const msg = buildZaloMessage(selectedReport);
+                            if (navigator.clipboard && navigator.clipboard.writeText) {
+                              await navigator.clipboard.writeText(msg);
+                            }
+                            setDetailCopiedZalo(true);
+                            setTimeout(() => setDetailCopiedZalo(false), 3000);
+                          } catch (_) {
+                            setZaloReport(selectedReport);
+                          }
+                        }}
+                        className={`border font-mono font-bold text-xs py-2 px-2.5 rounded-lg flex items-center justify-center gap-1.5 cursor-pointer shadow-2xs transition-all ${
+                          detailCopiedZalo 
+                            ? 'bg-emerald-600 text-white border-emerald-600' 
+                            : 'bg-white hover:bg-blue-50 border-blue-300 text-blue-900'
+                        }`}
+                        title="Sao chép tin nhắn ngắn gọn gửi Zalo"
+                      >
+                        {detailCopiedZalo ? <Check className="h-3.5 w-3.5" /> : <Copy className="h-3.5 w-3.5 text-blue-600" />}
+                        <span>{detailCopiedZalo ? 'ĐÃ SAO CHÉP!' : 'SAO CHÉP TIN'}</span>
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => setZaloReport(selectedReport)}
+                        className="bg-[#0068FF] hover:bg-[#0055d4] active:bg-[#0047b3] text-white font-mono font-bold text-xs py-2 px-2.5 rounded-lg flex items-center justify-center gap-1.5 cursor-pointer shadow-2xs transition-colors border-none"
+                        title="Mở hộp thoại tải trọn bộ ảnh và chia sẻ Zalo"
+                      >
+                        <ZaloIcon className="h-3.5 w-3.5" />
+                        <span>GỬI & TẢI ẢNH ZALO</span>
+                      </button>
+                    </div>
+                  </div>
                 )}
 
                 {/* Edit & Delete Controls Panel */}
@@ -2268,15 +2331,27 @@ export const QCHistory = React.memo(function QCHistory({ user, token, userProfil
                 </div>
               ) : null;
             })()}
-            <a 
-              href={selectedReport.imageUrls[lightboxIndex]} 
-              target="_blank" 
-              rel="noreferrer noopener"
-              className="flex items-center gap-1.5 px-5 py-2.5 bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs rounded-full shadow-lg transition-all hover:scale-105"
-            >
-              <ExternalLink className="h-4 w-4" />
-              Mở ảnh gốc trên Google Drive
-            </a>
+            <div className="flex flex-wrap items-center justify-center gap-2.5">
+              <button
+                type="button"
+                onClick={() => setZaloReport(selectedReport)}
+                className="flex items-center gap-1.5 px-4 py-2.5 bg-[#0068FF] hover:bg-[#0055d4] text-white font-bold text-xs rounded-full shadow-lg transition-all hover:scale-105 cursor-pointer border-none"
+                title="Chia sẻ báo cáo chất lượng và ảnh này sang Zalo"
+              >
+                <ZaloIcon className="h-4 w-4" />
+                <span>CHIA SẺ SANG ZALO</span>
+              </button>
+
+              <a 
+                href={selectedReport.imageUrls[lightboxIndex]} 
+                target="_blank" 
+                rel="noreferrer noopener"
+                className="flex items-center gap-1.5 px-4 py-2.5 bg-slate-800 hover:bg-slate-700 text-white font-bold text-xs rounded-full shadow-lg transition-all hover:scale-105 border border-white/20"
+              >
+                <ExternalLink className="h-4 w-4" />
+                Mở ảnh gốc trên Google Drive
+              </a>
+            </div>
           </div>
         </div>
       )}

@@ -45,6 +45,7 @@ import {
   DEFAULT_SUPPLIER_MODELS,
   DEFAULT_COLORS_LIST
 } from './components/AdminPanel';
+import { ZaloShareModal, ZaloIcon, ZaloShareReportData } from './components/ZaloShareModal';
 
 export interface DefectPhotoItem {
   id: string;
@@ -200,6 +201,8 @@ export function QCForm({ user, token, onLogout }: QCFormProps) {
     floorOption: string;
     date: string;
   } | null>(null);
+  const [zaloReport, setZaloReport] = useState<ZaloShareReportData | null>(null);
+  const [lastSubmittedReport, setLastSubmittedReport] = useState<ZaloShareReportData | null>(null);
   
   const [colorOption, setColorOption] = useState('');
   const [customColorInput, setCustomColorInput] = useState('');
@@ -1061,6 +1064,26 @@ export function QCForm({ user, token, onLogout }: QCFormProps) {
       date
     });
 
+    // Save report data for Zalo sharing
+    setLastSubmittedReport({
+      order: order.trim(),
+      shoeModel: effectiveModel,
+      colorCode: effectiveColor,
+      errorName: effectiveErrorName,
+      errorNames: finalErrors,
+      imageErrors: reportImageErrors,
+      supplier: supplier.trim(),
+      floor,
+      part: finalPart,
+      subPart: subPart.trim(),
+      date,
+      createdAt: new Date(),
+      employeeName: userProfile?.name || '',
+      employeeId: userProfile?.employeeId || user.email?.split('@')[0] || 'Unknown',
+      note: note.trim() || undefined,
+      imageFiles: reportFiles
+    });
+
     // Reset form: respect keepOrderInfo
     if (keepOrderInfo) {
       setSelectedErrors([]);
@@ -1183,6 +1206,11 @@ export function QCForm({ user, token, onLogout }: QCFormProps) {
 
       const imageUrls = await Promise.all(uploadPromises);
       setBackgroundTasks(prev => prev.map(t => t.id === taskId ? { ...t, progress: 90 } : t));
+      
+      setLastSubmittedReport(prev => (prev && prev.order === reportPayloadBase.order) ? {
+        ...prev,
+        imageUrls
+      } : prev);
       
       const reportId = `report_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
       const reportData: any = {
@@ -2036,6 +2064,21 @@ export function QCForm({ user, token, onLogout }: QCFormProps) {
                   <p className="text-xs text-emerald-800 ml-6 leading-relaxed">
                     {successMessage || 'Biên bản đã được lưu trữ và tiến hành tải ngầm lên hệ thống.'}
                   </p>
+                  
+                  {lastSubmittedReport && (
+                    <div className="flex flex-wrap items-center gap-2 mt-1 ml-6">
+                      <button
+                        type="button"
+                        onClick={() => setZaloReport(lastSubmittedReport)}
+                        className="text-xs font-mono font-bold text-white bg-[#0068FF] hover:bg-[#0055d4] active:bg-[#0047b3] border border-blue-600 py-1.5 px-3 rounded flex items-center gap-1.5 cursor-pointer transition-colors shadow-2xs"
+                        title="Chia sẻ thông tin đơn hàng và hình ảnh lỗi vừa tạo sang Zalo"
+                      >
+                        <ZaloIcon className="h-3.5 w-3.5" />
+                        <span>CHIA SẺ SANG ZALO</span>
+                      </button>
+                    </div>
+                  )}
+
                   {lastOrderInfo && !order && (
                     <button
                       type="button"
@@ -2422,6 +2465,14 @@ export function QCForm({ user, token, onLogout }: QCFormProps) {
             </div>
           </div>
         </div>
+      )}
+      {/* Zalo Share Modal */}
+      {zaloReport && (
+        <ZaloShareModal 
+          report={zaloReport} 
+          onClose={() => setZaloReport(null)} 
+          token={token} 
+        />
       )}
       </>
       )}

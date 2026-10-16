@@ -10,7 +10,7 @@ import {
   CheckCircle2,
   AlertCircle
 } from 'lucide-react';
-import { saveAs } from 'file-saver';
+import { saveAs } from '../lib/download';
 import JSZip from 'jszip';
 
 export function ZaloIcon({ className = "w-5 h-5" }: { className?: string }) {
@@ -206,7 +206,7 @@ async function copyBlobToClipboard(blob: Blob): Promise<boolean> {
       URL.revokeObjectURL(url);
     }
 
-    if (navigator.clipboard && navigator.clipboard.write) {
+    if (typeof ClipboardItem !== 'undefined' && navigator.clipboard && navigator.clipboard.write) {
       await navigator.clipboard.write([
         new ClipboardItem({ 'image/png': pngBlob })
       ]);

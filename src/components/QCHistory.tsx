@@ -905,6 +905,10 @@ export const QCHistory = React.memo(function QCHistory({ user, token, userProfil
       const mergedList = Array.from(mergedMap.values());
       setReports(mergedList);
 
+      if (mergedList.length > 0 && typeof window !== 'undefined' && window.innerWidth >= 1024) {
+        setSelectedReport(prev => prev || mergedList[0]);
+      }
+
       if (!firestoreHealthy && localReports.length > 0) {
         setSyncStatusMsg('Đang hiển thị ở chế độ ngoại tuyến. Các báo cáo chưa đồng bộ được gắn nhãn riêng.');
       } else {
@@ -1388,6 +1392,23 @@ export const QCHistory = React.memo(function QCHistory({ user, token, userProfil
                 <RefreshCw className={`h-3.5 w-3.5 ${isLoading ? 'animate-spin' : ''}`} />
                 <span className="hidden sm:inline">LÀM MỚI</span>
               </button>
+
+              <button
+                type="button"
+                onClick={() => {
+                  if (selectedReport) {
+                    setZaloReport(selectedReport);
+                  } else if (filteredReports.length > 0) {
+                    setZaloReport(filteredReports[0]);
+                  }
+                }}
+                disabled={isLoading || filteredReports.length === 0}
+                className="h-9 px-3 text-xs font-mono font-bold flex items-center justify-center gap-1.5 text-white bg-[#0068FF] hover:bg-[#0055d4] active:bg-[#0047b3] border border-blue-600 rounded transition-colors disabled:opacity-50 cursor-pointer shadow-xs"
+                title="Chia sẻ báo cáo chất lượng này sang Zalo"
+              >
+                <ZaloIcon className="h-4 w-4" />
+                <span>CHIA SẺ ZALO</span>
+              </button>
             </div>
           </div>
         </div>
@@ -1562,11 +1583,11 @@ export const QCHistory = React.memo(function QCHistory({ user, token, userProfil
                         e.stopPropagation();
                         setZaloReport(report);
                       }}
-                      className="p-1.5 rounded-md text-[#0068FF] bg-blue-50/70 hover:bg-[#0068FF] hover:text-white border border-blue-200 hover:border-[#0068FF] transition-all cursor-pointer flex items-center gap-1 text-[11px] font-mono font-bold shrink-0 shadow-2xs"
+                      className="px-2.5 py-1.5 rounded-md text-white bg-[#0068FF] hover:bg-[#0055d4] active:bg-[#0047b3] transition-all cursor-pointer flex items-center gap-1.5 text-xs font-mono font-bold shrink-0 shadow-xs"
                       title="Chia sẻ báo cáo đơn hàng này sang Zalo"
                     >
-                      <ZaloIcon className="h-3.5 w-3.5" />
-                      <span className="hidden sm:inline">Zalo</span>
+                      <ZaloIcon className="h-4 w-4" />
+                      <span>Chia sẻ Zalo</span>
                     </button>
                     <ChevronRight className="h-4 w-4 text-slate-400 hidden sm:block" />
                   </div>
@@ -1578,10 +1599,10 @@ export const QCHistory = React.memo(function QCHistory({ user, token, userProfil
       </div>
 
       {/* Right Column (Desktop Detail Pane) */}
-      <div className={`w-full lg:w-2/5 min-h-0 lg:min-w-[420px] flex-col h-auto md:h-full ${selectedReport ? 'flex' : 'hidden'}`}>
+      <div className={`w-full lg:w-2/5 min-h-0 lg:min-w-[420px] flex-col h-auto md:h-full ${selectedReport ? 'flex' : 'hidden lg:flex'}`}>
         
         {/* Selected Details Drawer Pane */}
-        <div className={`bg-white rounded-lg border border-slate-200 shadow-xs flex flex-col lg:overflow-hidden flex-1 h-auto lg:h-full lg:min-h-0 ${selectedReport ? 'flex' : 'hidden'}`}>
+        <div className="bg-white rounded-lg border border-slate-200 shadow-xs flex flex-col lg:overflow-hidden flex-1 h-auto lg:h-full lg:min-h-0">
           {selectedReport ? (
             <div className="flex-1 flex flex-col h-auto lg:h-full lg:overflow-y-auto">
               {/* Header Title */}
@@ -2132,12 +2153,28 @@ export const QCHistory = React.memo(function QCHistory({ user, token, userProfil
               </div>
             </div>
           ) : (
-            <div className="flex-1 flex flex-col items-center justify-center text-center p-6 text-slate-400">
-              <Info className="h-10 w-10 text-slate-300 mb-2" />
-              <p className="text-sm font-bold text-slate-500">Xem chi tiết báo cáo</p>
-              <p className="text-xs text-slate-400 max-w-[240px] mt-1 space-y-1">
-                <span>Chọn bất kỳ báo cáo lỗi nào ở danh sách để hiển thị chi tiết hình ảnh & biên bản.</span>
+            <div className="flex-1 flex flex-col items-center justify-center text-center p-8 text-slate-500">
+              <div className="w-14 h-14 rounded-2xl bg-blue-50 border border-blue-200 flex items-center justify-center mb-3 shadow-2xs">
+                <ZaloIcon className="h-8 w-8" />
+              </div>
+              <p className="text-sm font-bold text-slate-800 font-mono uppercase">CHIA SẺ BÁO CÁO QUA ZALO</p>
+              <p className="text-xs text-slate-500 max-w-[280px] mt-1.5 leading-relaxed">
+                Chọn bất kỳ báo cáo lỗi nào ở danh sách để xem chi tiết hình ảnh, biên bản kiểm tra và bấm nút chia sẻ sang Zalo.
               </p>
+              {filteredReports.length > 0 && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setSelectedReport(filteredReports[0]);
+                    setActiveDetailImageIndex(0);
+                    setLoadedImageUrls({});
+                  }}
+                  className="mt-4 bg-[#0068FF] hover:bg-[#0055d4] active:bg-[#0047b3] text-white text-xs font-mono font-bold py-2 px-3.5 rounded-lg flex items-center gap-2 cursor-pointer shadow-xs transition-colors"
+                >
+                  <ZaloIcon className="h-4 w-4" />
+                  <span>XEM & CHIA SẺ BÁO CÁO NÀY</span>
+                </button>
+              )}
             </div>
           )}
         </div>

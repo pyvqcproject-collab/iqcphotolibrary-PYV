@@ -1,627 +1,667 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect } from 'react';
 import { 
+  X, 
   Copy, 
   Check, 
-  ExternalLink, 
+  Send, 
   Download, 
-  Image as ImageIcon, 
-  Search, 
-  Share2, 
-  Calendar, 
-  User as UserIcon, 
-  CheckCircle2, 
-  AlertCircle,
-  FileSpreadsheet,
-  ArrowRight,
-  RefreshCw,
-  MessageSquare
+  ExternalLink, 
+  Image as ImageIcon,
+  CheckCircle2,
+  AlertCircle
 } from 'lucide-react';
-import { ZaloIcon, ZaloShareReportData, buildZaloMessage } from './ZaloShareModal';
 import { saveAs } from '../lib/download';
 import JSZip from 'jszip';
-import { DriveImage } from './QCHistory';
-import { format } from 'date-fns';
 
-interface ZaloShareCenterProps {
-  currentReport: ZaloShareReportData | null;
-  historyReports?: any[];
-  token?: string;
-  onNavigateToCreate?: () => void;
-  onNavigateToHistory?: () => void;
+export function ZaloIcon({ className = "w-5 h-5" }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 48 48" className={className} fill="none">
+      <circle cx="24" cy="24" r="22" fill="#0068FF" />
+      <path 
+        d="M13 18h11.2l-9.8 11.8H25v2.8H11.8v-2.3L21.7 18.5H13V18z" 
+        fill="#FFFFFF" 
+      />
+      <circle cx="31.5" cy="24" r="3.2" fill="#FFFFFF" />
+      <path d="M28.3 14h2.8v10h-2.8V14z" fill="#FFFFFF" />
+      <path d="M37 18h2.8v14.6H37V18z" fill="#FFFFFF" />
+      <ellipse cx="38.4" cy="27" rx="3.5" ry="3.5" fill="#FFFFFF" />
+    </svg>
+  );
 }
 
-export function ZaloShareCenter({
-  currentReport,
-  historyReports = [],
-  token,
-  onNavigateToCreate,
-  onNavigateToHistory
-}: ZaloShareCenterProps) {
-  // Source selection: 'current' | 'history'
-  const [selectedSource, setSelectedSource] = useState<'current' | 'history'>(
-    currentReport ? 'current' : (historyReports.length > 0 ? 'history' : 'current')
-  );
-  
-  // Selected history report id
-  const [selectedHistoryId, setSelectedHistoryId] = useState<string>(
-    historyReports.length > 0 ? historyReports[0].id : ''
-  );
-  const [searchPo, setSearchPo] = useState('');
-  const [customNote, setCustomNote] = useState('');
+export interface ZaloShareReportData {
+  id?: string;
+  order: string;
+  shoeModel?: string;
+  colorCode: string;
+  errorName: string;
+  errorNames?: string[];
+  imageErrors?: string[];
+  supplier: string;
+  floor: string;
+  part?: string;
+  subPart?: string;
+  date?: string;
+  createdAt?: string | Date;
+  employeeName?: string;
+  employeeId?: string;
+  note?: string;
+  imageUrls?: string[];
+  imageFiles?: File[];
+}
+
+interface ZaloShareModalProps {
+  report: ZaloShareReportData | null;
+  onClose: () => void;
+  token?: string;
+}
+
+/**
+ * Tạo nội dung tin nhắn Zalo cực kỳ ngắn gọn, súc tích:
+ * Chỉ gồm thông tin đơn hàng thiết yếu, KHÔNG chứa chuỗi base64 dài dòng, KHÔNG ký tự thừa!
+ */
+export function buildZaloMessage(report: ZaloShareReportData, customNote?: string): string {
+  const lines: string[] = [];
+
+  // 1. PO
+  lines.push(`PO: ${report.order || 'Không có PO'}`);
+
+  // 2. Hình thể / Model (nếu có)
+  if (report.shoeModel) {
+    lines.push(`Hình thể: ${report.shoeModel}`);
+  }
+
+  // 3. Màu
+  if (report.colorCode) {
+    lines.push(`Màu: ${report.colorCode}`);
+  }
+
+  // 4. Bộ vị
+  const partFull = report.subPart 
+    ? `${report.part || ''} - ${report.subPart}`.trim() 
+    : (report.part || '');
+  if (partFull) {
+    lines.push(`Bộ vị: ${partFull}`);
+  }
+
+  // 5. Lỗi
+  const errorsList = report.errorNames && report.errorNames.length > 0 
+    ? report.errorNames 
+    : (report.errorName ? [report.errorName] : []);
+  if (errorsList.length > 0) {
+    lines.push(`Lỗi: ${errorsList.join(', ')}`);
+  }
+
+  // 6. Xưởng & Vị trí
+  const loc = [report.supplier, report.floor].filter(Boolean).join(' - ');
+  if (loc) {
+    lines.push(`Xưởng/Vị trí: ${loc}`);
+  }
+
+  // 7. Ghi chú (nếu có)
+  const note = (customNote || report.note || '').trim();
+  if (note) {
+    lines.push(`Ghi chú: ${note}`);
+  }
+
+  return lines.join('\n');
+}
+
+/**
+ * Trợ giúp lấy Blob từ URL ảnh hoặc File
+ */
+async function resolveImageBlob(source: string | File, token?: string): Promise<Blob | null> {
+  if (source instanceof File) {
+    return source;
+  }
+  if (typeof source !== 'string') return null;
+
+  // Base64 data URL
+  if (source.startsWith('data:')) {
+    try {
+      const res = await fetch(source);
+      return await res.blob();
+    } catch {
+      return null;
+    }
+  }
+
+  // Google Drive URL
+  const fileIdMatch = source.match(/\/file\/d\/([a-zA-Z0-9_-]+)/) 
+    || source.match(/[?&]id=([a-zA-Z0-9_-]+)/)
+    || source.match(/open\?id=([a-zA-Z0-9_-]+)/);
+  const fileId = fileIdMatch ? fileIdMatch[1] : null;
+
+  if (fileId && token && token !== 'NO_TOKEN') {
+    try {
+      const res = await fetch(`https://www.googleapis.com/drive/v3/files/${fileId}?alt=media`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      if (res.ok) {
+        return await res.blob();
+      }
+    } catch (_) {}
+  }
+
+  // Trực tiếp fetch
+  try {
+    const res = await fetch(source, { mode: 'cors' });
+    if (res.ok) return await res.blob();
+  } catch (_) {}
+
+  // Fallback Canvas
+  try {
+    return await new Promise<Blob | null>((resolve) => {
+      const img = new Image();
+      img.crossOrigin = 'anonymous';
+      img.onload = () => {
+        try {
+          const canvas = document.createElement('canvas');
+          canvas.width = img.naturalWidth || img.width;
+          canvas.height = img.naturalHeight || img.height;
+          const ctx = canvas.getContext('2d');
+          if (ctx) {
+            ctx.drawImage(img, 0, 0);
+            canvas.toBlob((b) => resolve(b), 'image/jpeg', 0.9);
+          } else {
+            resolve(null);
+          }
+        } catch {
+          resolve(null);
+        }
+      };
+      img.onerror = () => resolve(null);
+      img.src = source;
+    });
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Sao chép ảnh vào clipboard dưới dạng PNG để người dùng có thể Ctrl+V thẳng vào Zalo
+ */
+async function copyBlobToClipboard(blob: Blob): Promise<boolean> {
+  try {
+    let pngBlob = blob;
+    // Clipboard API yêu cầu chuẩn image/png
+    if (blob.type !== 'image/png') {
+      const img = new Image();
+      const url = URL.createObjectURL(blob);
+      await new Promise<void>((resolve, reject) => {
+        img.onload = () => resolve();
+        img.onerror = () => reject(new Error('Image decode failed'));
+        img.src = url;
+      });
+
+      const canvas = document.createElement('canvas');
+      canvas.width = img.naturalWidth || img.width;
+      canvas.height = img.naturalHeight || img.height;
+      const ctx = canvas.getContext('2d');
+      if (ctx) {
+        ctx.drawImage(img, 0, 0);
+        const converted = await new Promise<Blob | null>((res) => canvas.toBlob(res, 'image/png'));
+        if (converted) pngBlob = converted;
+      }
+      URL.revokeObjectURL(url);
+    }
+
+    if (typeof ClipboardItem !== 'undefined' && navigator.clipboard && navigator.clipboard.write) {
+      await navigator.clipboard.write([
+        new ClipboardItem({ 'image/png': pngBlob })
+      ]);
+      return true;
+    }
+    return false;
+  } catch (err) {
+    console.warn("Lỗi sao chép ảnh vào clipboard:", err);
+    return false;
+  }
+}
+
+export function ZaloShareModal({ report, onClose, token }: ZaloShareModalProps) {
   const [copiedText, setCopiedText] = useState(false);
   const [copiedImageIdx, setCopiedImageIdx] = useState<number | null>(null);
+  const [isSharing, setIsSharing] = useState(false);
+  const [isDownloading, setIsDownloading] = useState(false);
+  const [customNote, setCustomNote] = useState('');
   const [statusNotice, setStatusNotice] = useState<string | null>(null);
-  const [isDownloadingZip, setIsDownloadingZip] = useState(false);
 
-  // Filter history reports by PO search
-  const filteredHistoryReports = useMemo(() => {
-    if (!searchPo.trim()) return historyReports;
-    const q = searchPo.toLowerCase().trim();
-    return historyReports.filter(r => 
-      (r.order && r.order.toLowerCase().includes(q)) ||
-      (r.shoeModel && r.shoeModel.toLowerCase().includes(q)) ||
-      (r.errorName && r.errorName.toLowerCase().includes(q)) ||
-      (r.floor && r.floor.toLowerCase().includes(q))
-    );
-  }, [historyReports, searchPo]);
+  // Danh sách hình ảnh preview (local URL hoặc web URL)
+  const [photoPreviews, setPhotoPreviews] = useState<Array<{
+    source: string | File;
+    previewUrl: string;
+    defectName: string;
+    index: number;
+  }>>([]);
 
-  // Determine active report to share
-  const activeReport: ZaloShareReportData | null = useMemo(() => {
-    if (selectedSource === 'current' && currentReport) {
-      return currentReport;
-    }
+  useEffect(() => {
+    if (!report) return;
 
-    if (historyReports.length > 0) {
-      const target = historyReports.find(r => r.id === selectedHistoryId) || historyReports[0];
-      if (target) {
-        return {
-          id: target.id,
-          order: target.order || 'Không có PO',
-          shoeModel: target.shoeModel,
-          colorCode: target.colorCode || '',
-          errorName: target.errorName || 'Lỗi',
-          errorNames: target.errorNames || (target.errorName ? [target.errorName] : []),
-          imageErrors: target.imageErrors,
-          supplier: target.supplier || '',
-          floor: target.floor || '',
-          part: target.part,
-          subPart: target.subPart,
-          date: target.date,
-          createdAt: target.createdAt,
-          employeeName: target.employeeName,
-          employeeId: target.employeeId,
-          note: target.note,
-          imageUrls: target.imageUrls || []
-        };
-      }
-    }
-
-    return currentReport || null;
-  }, [selectedSource, currentReport, historyReports, selectedHistoryId]);
-
-  // Text message generated
-  const zaloMessage = useMemo(() => {
-    if (!activeReport) return 'Chưa có thông tin đơn hàng để chia sẻ.';
-    return buildZaloMessage(activeReport, customNote.trim() || undefined);
-  }, [activeReport, customNote]);
-
-  // Image items
-  const photoItems = useMemo(() => {
-    if (!activeReport) return [];
-    const items: Array<{
+    const previews: Array<{
       source: string | File;
       previewUrl: string;
       defectName: string;
       index: number;
     }> = [];
 
-    if (activeReport.imageFiles && activeReport.imageFiles.length > 0) {
-      activeReport.imageFiles.forEach((file, idx) => {
-        const defect = (activeReport.imageErrors && activeReport.imageErrors[idx])
-          || (activeReport.errorNames && activeReport.errorNames[idx])
-          || activeReport.errorName
-          || 'Lỗi';
-        items.push({
+    // Nếu có imageFiles (File cục bộ sau khi submit)
+    if (report.imageFiles && report.imageFiles.length > 0) {
+      report.imageFiles.forEach((file, idx) => {
+        const specificError = (report.imageErrors && report.imageErrors[idx])
+          ? report.imageErrors[idx]
+          : (report.errorNames && report.errorNames[idx])
+            ? report.errorNames[idx]
+            : (report.errorName || 'Lỗi');
+        previews.push({
           source: file,
           previewUrl: URL.createObjectURL(file),
-          defectName: defect,
+          defectName: specificError,
           index: idx
         });
       });
-    } else if (activeReport.imageUrls && activeReport.imageUrls.length > 0) {
-      activeReport.imageUrls.forEach((url, idx) => {
-        const defect = (activeReport.imageErrors && activeReport.imageErrors[idx])
-          || (activeReport.errorNames && activeReport.errorNames[idx])
-          || activeReport.errorName
-          || 'Lỗi';
-        items.push({
+    } else if (report.imageUrls && report.imageUrls.length > 0) {
+      report.imageUrls.forEach((url, idx) => {
+        const specificError = (report.imageErrors && report.imageErrors[idx])
+          ? report.imageErrors[idx]
+          : (report.errorNames && report.errorNames[idx])
+            ? report.errorNames[idx]
+            : (report.errorName || 'Lỗi');
+        previews.push({
           source: url,
           previewUrl: url,
-          defectName: defect,
+          defectName: specificError,
           index: idx
         });
       });
     }
 
-    return items;
-  }, [activeReport]);
+    setPhotoPreviews(previews);
 
-  // 1. Sao chép nội dung tin nhắn
+    return () => {
+      // Dọn dẹp object URLs tạo từ File
+      previews.forEach(p => {
+        if (p.source instanceof File && p.previewUrl.startsWith('blob:')) {
+          URL.revokeObjectURL(p.previewUrl);
+        }
+      });
+    };
+  }, [report]);
+
+  if (!report) return null;
+
+  // Tin nhắn ngắn gọn - chỉ thông tin đơn hàng
+  const compactMessage = buildZaloMessage(report, customNote.trim() || undefined);
+  const totalPhotos = photoPreviews.length;
+
+  // 1. Sao chép nội dung thông tin đơn hàng
   const handleCopyText = async () => {
     try {
-      if (navigator.clipboard && navigator.clipboard.writeText) {
-        await navigator.clipboard.writeText(zaloMessage);
-      } else {
-        const textArea = document.createElement("textarea");
-        textArea.value = zaloMessage;
-        textArea.style.position = 'fixed';
-        textArea.style.opacity = '0';
-        document.body.appendChild(textArea);
-        textArea.select();
-        document.execCommand("copy");
-        document.body.removeChild(textArea);
-      }
+      await navigator.clipboard.writeText(compactMessage);
       setCopiedText(true);
-      setStatusNotice('Đã sao chép tin nhắn vào bộ nhớ tạm! Bạn có thể dán (Ctrl+V) vào Zalo ngay.');
+      setStatusNotice('Đã sao chép thông tin đơn hàng! Vào Zalo nhấn Ctrl + V để dán.');
+      setTimeout(() => {
+        setCopiedText(false);
+      }, 3000);
+    } catch {
+      const textArea = document.createElement("textarea");
+      textArea.value = compactMessage;
+      document.body.appendChild(textArea);
+      textArea.select();
+      document.execCommand("copy");
+      document.body.removeChild(textArea);
+      setCopiedText(true);
+      setStatusNotice('Đã sao chép thông tin đơn hàng!');
       setTimeout(() => setCopiedText(false), 3000);
-    } catch (_) {
-      setStatusNotice('Đã chọn văn bản bên dưới, bạn hãy nhấn Ctrl + C để sao chép.');
     }
   };
 
-  // 2. Tải 1 ảnh về máy
-  const handleDownloadSinglePhoto = (item: typeof photoItems[0]) => {
+  // 2. Sao chép 1 tấm ảnh vào Clipboard (Ctrl + V vào Zalo để dán thẳng ảnh)
+  const handleCopySingleImage = async (item: typeof photoPreviews[0]) => {
     try {
-      const fileName = `PO_${activeReport?.order || 'QC'}_Anh_${item.index + 1}_${item.defectName.replace(/[^a-zA-Z0-9]/g, '_')}.jpg`;
-      if (item.source instanceof File) {
-        saveAs(item.source, fileName);
-        setStatusNotice(`Đã tải ảnh #${item.index + 1} về máy.`);
-      } else if (typeof item.source === 'string') {
-        const a = document.createElement('a');
-        a.href = item.source;
-        a.download = fileName;
-        a.target = '_blank';
-        a.rel = 'noopener noreferrer';
-        document.body.appendChild(a);
-        a.click();
-        document.body.removeChild(a);
-        setStatusNotice(`Đã chuẩn bị tải ảnh #${item.index + 1}.`);
+      setStatusNotice('Đang xử lý ảnh để sao chép...');
+      const blob = await resolveImageBlob(item.source, token);
+      if (!blob) {
+        setStatusNotice('Không thể lấy dữ liệu ảnh để chép. Vui lòng thử nút Tải ảnh.');
+        return;
+      }
+
+      const success = await copyBlobToClipboard(blob);
+      if (success) {
+        setCopiedImageIdx(item.index);
+        setStatusNotice(`Đã sao chép Ảnh #${item.index + 1}! Bạn sang Zalo nhấn Ctrl + V để gửi ảnh.`);
+        setTimeout(() => setCopiedImageIdx(null), 3000);
+      } else {
+        // Fallback tải ảnh
+        saveAs(blob, `PO_${report.order}_${item.defectName.replace(/[^a-zA-Z0-9]/g, '_')}_${item.index + 1}.jpg`);
+        setStatusNotice(`Đã tải Ảnh #${item.index + 1} về máy để bạn kéo thả vào Zalo.`);
       }
     } catch (e) {
-      console.warn("Download photo error:", e);
+      console.warn("Copy image failed:", e);
+      setStatusNotice('Không hỗ trợ sao chép ảnh trực tiếp trên trình duyệt này. Đã sẵn sàng nút Tải ảnh.');
     }
   };
 
-  // 3. Sao chép ảnh vào Clipboard (Ctrl + V vào Zalo)
-  const handleCopyPhotoToClipboard = async (item: typeof photoItems[0]) => {
-    setStatusNotice('Đang xử lý ảnh để sao chép...');
+  // 3. Tải 1 tấm ảnh về máy
+  const handleDownloadSingleImage = async (item: typeof photoPreviews[0]) => {
     try {
-      if (item.source instanceof File) {
-        if (typeof ClipboardItem !== 'undefined' && navigator.clipboard && navigator.clipboard.write) {
-          await navigator.clipboard.write([
-            new ClipboardItem({ [item.source.type || 'image/png']: item.source })
-          ]);
-          setCopiedImageIdx(item.index);
-          setStatusNotice(`Đã sao chép Ảnh #${item.index + 1}! Bạn sang Zalo nhấn Ctrl + V để dán.`);
-          setTimeout(() => setCopiedImageIdx(null), 3000);
-          return;
-        }
+      const blob = await resolveImageBlob(item.source, token);
+      if (blob) {
+        saveAs(blob, `PO_${report.order}_${item.defectName.replace(/[^a-zA-Z0-9]/g, '_')}_${item.index + 1}.jpg`);
       }
-      // Fallback
-      handleDownloadSinglePhoto(item);
-    } catch (err) {
-      handleDownloadSinglePhoto(item);
+    } catch (e) {
+      console.error(e);
     }
   };
 
-  // 4. Tải tất cả ảnh dạng ZIP
-  const handleDownloadAllZip = async () => {
-    if (photoItems.length === 0) return;
-    setIsDownloadingZip(true);
-    setStatusNotice('Đang chuẩn bị gói hình ảnh...');
+  // 4. Chia sẻ trực tiếp qua Zalo (Web Share API kèm ảnh & tin nhắn)
+  const handleNativeShare = async () => {
+    setIsSharing(true);
+    setStatusNotice(null);
+
+    // Luôn copy thông tin đơn hàng vào bộ nhớ tạm trước làm phương án dự phòng
+    try {
+      await navigator.clipboard.writeText(compactMessage);
+    } catch (_) {}
 
     try {
-      const zip = new JSZip();
-      for (let i = 0; i < photoItems.length; i++) {
-        const item = photoItems[i];
-        const fileName = `PO_${activeReport?.order || 'QC'}_Anh_${i + 1}_${item.defectName.replace(/[^a-zA-Z0-9]/g, '_')}.jpg`;
+      // Chuẩn bị danh sách File để gửi qua Web Share API
+      const filesToShare: File[] = [];
+
+      for (let i = 0; i < photoPreviews.length; i++) {
+        const item = photoPreviews[i];
         if (item.source instanceof File) {
-          zip.file(fileName, item.source);
-        } else if (typeof item.source === 'string') {
-          try {
-            const res = await fetch(item.source);
-            if (res.ok) {
-              const b = await res.blob();
-              zip.file(fileName, b);
-            }
-          } catch (_) {
-            // Skip failed cors image
+          filesToShare.push(item.source);
+        } else {
+          const blob = await resolveImageBlob(item.source, token);
+          if (blob) {
+            filesToShare.push(
+              new File(
+                [blob], 
+                `PO_${report.order}_${item.defectName.replace(/[^a-zA-Z0-9]/g, '_')}_${i + 1}.jpg`, 
+                { type: blob.type || 'image/jpeg' }
+              )
+            );
           }
         }
       }
-      const blob = await zip.generateAsync({ type: 'blob' });
-      saveAs(blob, `PO_${activeReport?.order || 'QC'}_Hinh_Anh_Loi.zip`);
-      setStatusNotice('Đã tải tệp ZIP chứa toàn bộ ảnh thành công!');
-    } catch (e) {
-      console.warn("ZIP failed:", e);
-      setStatusNotice('Không thể nén tự động. Bạn có thể tải từng ảnh bên dưới.');
+
+      // Kiểm tra hỗ trợ Web Share API với files
+      if (typeof navigator !== 'undefined' && navigator.share) {
+        if (filesToShare.length > 0 && navigator.canShare && navigator.canShare({ files: filesToShare })) {
+          await navigator.share({
+            title: `PO: ${report.order}`,
+            text: compactMessage,
+            files: filesToShare,
+          });
+          setIsSharing(false);
+          return;
+        }
+
+        // Nếu không share được files cùng lúc thì share text
+        await navigator.share({
+          title: `PO: ${report.order}`,
+          text: compactMessage,
+        });
+        setIsSharing(false);
+        return;
+      }
+
+      // Môi trường không có Web Share (PC/Desktop) => Mở Zalo Web
+      handleOpenZaloWeb();
+    } catch (err: any) {
+      if (err.name !== 'AbortError') {
+        handleOpenZaloWeb();
+      }
     } finally {
-      setIsDownloadingZip(false);
+      setIsSharing(false);
+    }
+  };
+
+  // 5. Mở Zalo Web an toàn (tránh bị trình duyệt chặn popup trong iframe)
+  const handleOpenZaloWeb = () => {
+    handleCopyText();
+    const link = document.createElement('a');
+    link.href = 'https://chat.zalo.me/';
+    link.target = '_blank';
+    link.rel = 'noopener noreferrer';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
+  // 6. Tải toàn bộ ảnh
+  const handleDownloadAllPhotos = async () => {
+    if (photoPreviews.length === 0) return;
+    setIsDownloading(true);
+    try {
+      if (photoPreviews.length === 1) {
+        await handleDownloadSingleImage(photoPreviews[0]);
+      } else {
+        const zip = new JSZip();
+        for (let i = 0; i < photoPreviews.length; i++) {
+          const item = photoPreviews[i];
+          const blob = await resolveImageBlob(item.source, token);
+          if (blob) {
+            zip.file(
+              `PO_${report.order}_${item.defectName.replace(/[^a-zA-Z0-9]/g, '_')}_${i + 1}.jpg`, 
+              blob
+            );
+          }
+        }
+        const content = await zip.generateAsync({ type: 'blob' });
+        saveAs(content, `PO_${report.order}_Zalo_Photos.zip`);
+      }
+      setStatusNotice('Đã tải hình ảnh về máy thành công!');
+    } catch (e: any) {
+      console.error(e);
+      setStatusNotice('Không thể nén tải tất cả ảnh. Vui lòng bấm tải từng ảnh bên dưới.');
+    } finally {
+      setIsDownloading(false);
     }
   };
 
   return (
-    <div className="flex-1 flex flex-col bg-slate-100 overflow-y-auto p-3 sm:p-5 lg:p-6 pb-24 md:pb-6">
-      <div className="max-w-6xl mx-auto w-full space-y-5">
-        
-        {/* Header Banner - Zalo Brand */}
-        <div className="bg-gradient-to-r from-[#0068FF] to-blue-700 text-white rounded-2xl p-4 sm:p-6 shadow-md border border-blue-600/40 flex flex-col md:flex-row md:items-center justify-between gap-4">
-          <div className="flex items-center gap-3.5">
-            <div className="w-12 h-12 sm:w-14 sm:h-14 rounded-2xl bg-white p-1.5 flex items-center justify-center shadow-md shrink-0">
-              <ZaloIcon className="w-10 h-10 sm:w-11 sm:h-11" />
+    <div 
+      className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-3 sm:p-4 select-none animate-in fade-in duration-200"
+      onClick={onClose}
+    >
+      <div 
+        className="bg-white rounded-2xl shadow-2xl border border-slate-200 w-full max-w-lg max-h-[90vh] flex flex-col overflow-hidden animate-in zoom-in-95 duration-200"
+        onClick={(e) => e.stopPropagation()}
+      >
+        {/* Header Zalo Theme */}
+        <div className="bg-[#0068FF] text-white p-3.5 sm:p-4 flex items-center justify-between shrink-0">
+          <div className="flex items-center gap-2.5">
+            <div className="w-9 h-9 rounded-xl bg-white p-1 flex items-center justify-center shadow-sm">
+              <ZaloIcon className="w-7 h-7" />
             </div>
             <div>
-              <div className="flex items-center gap-2">
-                <span className="text-xs font-mono font-bold uppercase tracking-wider bg-white/20 px-2 py-0.5 rounded-full text-blue-50">
-                  TRUNG TÂM CHIA SẺ QC
-                </span>
-                <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
-              </div>
-              <h1 className="text-lg sm:text-2xl font-black tracking-tight mt-1">
-                Chia Sẻ Biên Bản & Minh Chứng Qua Zalo
-              </h1>
-              <p className="text-xs sm:text-sm text-blue-100 font-sans mt-0.5 leading-relaxed">
-                Tự động định dạng tin nhắn ngắn gọn, quản lý hình ảnh lỗi và hỗ trợ dán thẳng vào nhóm Zalo nhà máy
+              <h3 className="font-extrabold text-sm sm:text-base tracking-wide flex items-center gap-1.5">
+                Chia Sẻ Sang Zalo
+              </h3>
+              <p className="text-[11px] text-blue-100 font-mono">
+                Thông tin đơn hàng + {totalPhotos} hình ảnh
               </p>
             </div>
           </div>
-
-          {/* Quick Actions in Header */}
-          <div className="flex flex-wrap items-center gap-2 shrink-0">
-            <a
-              href="https://chat.zalo.me/"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="bg-white hover:bg-slate-100 text-[#0068FF] font-extrabold text-xs sm:text-sm py-2.5 px-4 rounded-xl flex items-center gap-2 shadow-sm transition-all hover:scale-[1.02] cursor-pointer"
-              title="Mở ứng dụng Zalo trên trình duyệt Web (chat.zalo.me)"
-            >
-              <ExternalLink className="h-4 w-4 text-[#0068FF]" />
-              <span>MỞ ZALO WEB</span>
-            </a>
-
-            <a
-              href="zalo://"
-              className="bg-blue-800/80 hover:bg-blue-900 text-white font-bold text-xs sm:text-sm py-2.5 px-3.5 rounded-xl flex items-center gap-2 border border-white/20 transition-all cursor-pointer"
-              title="Mở phần mềm Zalo Desktop cài sẵn trên máy tính của bạn"
-            >
-              <MessageSquare className="h-4 w-4" />
-              <span>MỞ APP ZALO</span>
-            </a>
-          </div>
+          <button
+            onClick={onClose}
+            className="p-1.5 rounded-full bg-white/10 hover:bg-white/20 text-white transition-colors cursor-pointer border-none"
+            title="Đóng"
+          >
+            <X className="h-5 w-5" />
+          </button>
         </div>
 
-        {/* Status Notification Toast */}
-        {statusNotice && (
-          <div className="p-3 bg-blue-50 border border-blue-200 rounded-xl text-xs sm:text-sm text-blue-950 flex items-center gap-2.5 font-medium shadow-xs animate-in fade-in duration-200">
-            <CheckCircle2 className="h-5 w-5 text-[#0068FF] shrink-0" />
-            <span className="flex-1">{statusNotice}</span>
-            <button 
-              onClick={() => setStatusNotice(null)}
-              className="text-xs font-mono font-bold text-slate-500 hover:text-slate-800 cursor-pointer"
-            >
-              ✕
-            </button>
-          </div>
-        )}
-
-        {/* Source Selector: Current Form or History */}
-        <div className="bg-white rounded-xl border border-slate-200 shadow-xs p-3.5 sm:p-4 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
-          <div className="flex items-center gap-2">
-            <span className="text-xs font-mono font-bold text-slate-500 uppercase">NGUỒN DỮ LIỆU:</span>
-            <div className="inline-flex rounded-lg bg-slate-100 p-1 border border-slate-200 text-xs font-mono font-bold">
-              <button
-                type="button"
-                onClick={() => setSelectedSource('current')}
-                className={`px-3 py-1.5 rounded-md transition-all cursor-pointer ${
-                  selectedSource === 'current' 
-                    ? 'bg-[#0068FF] text-white shadow-xs' 
-                    : 'text-slate-600 hover:text-slate-900'
-                }`}
-              >
-                ĐƠN VỪA TẠO / FORM HIỆN TẠI
-              </button>
-              <button
-                type="button"
-                onClick={() => setSelectedSource('history')}
-                className={`px-3 py-1.5 rounded-md transition-all cursor-pointer ${
-                  selectedSource === 'history' 
-                    ? 'bg-[#0068FF] text-white shadow-xs' 
-                    : 'text-slate-600 hover:text-slate-900'
-                }`}
-              >
-                CHỌN TỪ LỊCH SỬ QC ({historyReports.length})
-              </button>
-            </div>
-          </div>
-
-          {selectedSource === 'history' && (
-            <div className="flex items-center gap-2 flex-1 sm:max-w-xs">
-              <div className="relative w-full">
-                <Search className="absolute left-2.5 top-2.5 h-3.5 w-3.5 text-slate-400" />
-                <input
-                  type="text"
-                  placeholder="Tìm PO, hình thể, lỗi..."
-                  value={searchPo}
-                  onChange={e => setSearchPo(e.target.value)}
-                  className="w-full pl-8 pr-3 py-1.5 bg-slate-50 border border-slate-300 rounded-lg text-xs font-mono focus:bg-white focus:ring-1 focus:ring-blue-500 outline-none"
-                />
-              </div>
+        {/* Scrollable Body */}
+        <div className="p-3.5 sm:p-4 overflow-y-auto space-y-3.5 flex-1 text-slate-800">
+          
+          {/* Thông báo trạng thái tương tác */}
+          {statusNotice && (
+            <div className="p-2.5 bg-blue-50 border border-blue-200 rounded-xl text-xs text-blue-900 flex items-center gap-2 font-medium">
+              <CheckCircle2 className="h-4 w-4 text-[#0068FF] shrink-0" />
+              <span className="flex-1">{statusNotice}</span>
             </div>
           )}
-        </div>
 
-        {/* If History source is picked, show horizontal selector strip */}
-        {selectedSource === 'history' && (
-          <div className="bg-white rounded-xl border border-slate-200 shadow-xs p-3 space-y-2">
-            <div className="flex items-center justify-between text-xs font-mono">
-              <span className="text-slate-500 font-bold uppercase">
-                DANH SÁCH BÁO CÁO ({filteredHistoryReports.length}):
+          {/* 1. KHUNG THÔNG TIN ĐƠN HÀNG (Cực kỳ ngắn gọn, trực quan) */}
+          <div className="bg-slate-50 border border-slate-200 rounded-xl p-3 space-y-2">
+            <div className="flex items-center justify-between">
+              <span className="text-[11px] font-mono font-bold text-slate-500 uppercase">
+                Thông tin đơn hàng ({compactMessage.length} ký tự)
               </span>
-              <span className="text-slate-400 text-[11px]">Bấm vào thẻ để nạp dữ liệu gửi Zalo</span>
-            </div>
-
-            {filteredHistoryReports.length === 0 ? (
-              <div className="py-6 text-center text-xs text-slate-400 font-mono">
-                Không tìm thấy báo cáo nào phù hợp.
-              </div>
-            ) : (
-              <div className="flex items-center gap-2.5 overflow-x-auto pb-2 scrollbar-thin">
-                {filteredHistoryReports.slice(0, 20).map(report => {
-                  const isSelected = activeReport?.id === report.id || selectedHistoryId === report.id;
-                  return (
-                    <button
-                      key={report.id}
-                      type="button"
-                      onClick={() => setSelectedHistoryId(report.id)}
-                      className={`min-w-[210px] text-left p-2.5 rounded-xl border text-xs transition-all cursor-pointer shrink-0 ${
-                        isSelected 
-                          ? 'bg-blue-50 border-[#0068FF] shadow-xs ring-1 ring-[#0068FF]/30' 
-                          : 'bg-slate-50 border-slate-200 hover:border-slate-300 hover:bg-white'
-                      }`}
-                    >
-                      <div className="flex items-center justify-between">
-                        <span className="font-mono font-bold text-slate-900 truncate">
-                          PO: {report.order || 'N/A'}
-                        </span>
-                        <span className="text-[10px] font-mono text-slate-400">
-                          {report.date ? format(new Date(report.date), 'dd/MM') : ''}
-                        </span>
-                      </div>
-                      <div className="text-[11px] font-semibold text-red-600 truncate mt-1">
-                        {report.errorName || 'Lỗi'}
-                      </div>
-                      <div className="text-[10px] text-slate-500 font-mono flex items-center justify-between mt-1">
-                        <span>{report.floor || 'Xưởng'}</span>
-                        <span className="bg-slate-200 px-1.5 py-0.2 rounded font-bold">
-                          {report.imageUrls?.length || 0} ảnh
-                        </span>
-                      </div>
-                    </button>
-                  );
-                })}
-              </div>
-            )}
-          </div>
-        )}
-
-        {/* Main Content Workspace: 2 Columns */}
-        {!activeReport ? (
-          <div className="bg-white rounded-2xl border border-slate-200 shadow-xs p-10 text-center space-y-4">
-            <div className="w-16 h-16 rounded-2xl bg-blue-50 border border-blue-200 flex items-center justify-center mx-auto text-[#0068FF]">
-              <ZaloIcon className="h-10 w-10" />
-            </div>
-            <div>
-              <h3 className="font-extrabold text-base text-slate-800">Chưa có dữ liệu báo cáo để chia sẻ</h3>
-              <p className="text-xs text-slate-500 max-w-md mx-auto mt-1 leading-relaxed">
-                Bạn có thể quay lại tab "Tạo báo cáo" để nhập thông số đơn hàng hoặc chọn một báo cáo từ lịch sử.
-              </p>
-            </div>
-            {onNavigateToCreate && (
-              <button
-                type="button"
-                onClick={onNavigateToCreate}
-                className="inline-flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white font-mono font-bold text-xs py-2.5 px-4 rounded-xl shadow-xs transition-colors cursor-pointer"
-              >
-                <span>+ ĐẾN MÀN HÌNH TẠO BÁO CÁO</span>
-                <ArrowRight className="h-4 w-4" />
-              </button>
-            )}
-          </div>
-        ) : (
-          <div className="grid grid-cols-1 lg:grid-cols-12 gap-5">
-            
-            {/* Left Column: Formatted Zalo Message (Cols 5) */}
-            <div className="lg:col-span-5 bg-white rounded-2xl border border-slate-200 shadow-xs p-4 sm:p-5 flex flex-col gap-4">
-              <div className="flex items-center justify-between border-b border-slate-100 pb-3">
-                <div className="flex items-center gap-2">
-                  <span className="w-6 h-6 rounded-md bg-[#0068FF] text-white flex items-center justify-center text-xs font-mono font-bold">
-                    01
-                  </span>
-                  <h3 className="font-extrabold text-xs sm:text-sm font-mono uppercase text-slate-800">
-                    Nội Dung Tin Nhắn Zalo
-                  </h3>
-                </div>
-                <span className="text-[11px] font-mono text-slate-500 font-semibold bg-slate-100 px-2 py-0.5 rounded">
-                  {zaloMessage.length} ký tự
-                </span>
-              </div>
-
-              {/* Quick 1-click Copy Button */}
               <button
                 type="button"
                 onClick={handleCopyText}
-                className={`w-full py-3 px-4 rounded-xl font-mono font-bold text-xs sm:text-sm flex items-center justify-center gap-2 shadow-xs transition-all cursor-pointer border ${
-                  copiedText 
-                    ? 'bg-emerald-600 text-white border-emerald-600' 
-                    : 'bg-[#0068FF] hover:bg-[#0055d4] active:bg-[#0047b3] text-white border-blue-600 hover:shadow'
-                }`}
-                title="Sao chép nội dung ngắn gọn này vào bộ nhớ tạm"
+                className="text-xs font-mono font-bold text-[#0068FF] hover:text-blue-800 flex items-center gap-1 cursor-pointer transition-colors"
+                title="Sao chép nội dung ngắn gọn này"
               >
-                {copiedText ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
-                <span>{copiedText ? 'ĐÃ SAO CHÉP THÀNH CÔNG!' : '📋 SAO CHÉP NỘI DUNG GỬI ZALO'}</span>
+                {copiedText ? <Check className="h-3.5 w-3.5 text-emerald-600" /> : <Copy className="h-3.5 w-3.5" />}
+                <span>{copiedText ? 'Đã sao chép' : 'Sao chép thông tin'}</span>
               </button>
-
-              {/* Message Preview Box */}
-              <div className="relative">
-                <pre className="font-mono text-xs sm:text-[13px] bg-slate-900 text-slate-100 rounded-xl p-4 whitespace-pre-wrap leading-relaxed select-all border border-slate-800 overflow-x-auto shadow-inner">
-                  {zaloMessage}
-                </pre>
-                <div className="absolute top-2 right-2 text-[10px] font-mono text-slate-400 bg-slate-800/80 px-2 py-0.5 rounded border border-slate-700 pointer-events-none">
-                  Chuẩn hóa Zalo
-                </div>
-              </div>
-
-              {/* Optional Custom Note input */}
-              <div className="space-y-1.5 pt-1">
-                <label className="text-[11px] font-mono font-bold text-slate-600 uppercase">
-                  Lời nhắn gửi kèm thêm (Tùy chọn):
-                </label>
-                <input
-                  type="text"
-                  placeholder="Ví dụ: Lầu 2 vui lòng dừng kiểm tra đơn này..."
-                  value={customNote}
-                  onChange={e => setCustomNote(e.target.value)}
-                  className="w-full text-xs font-sans p-2.5 bg-slate-50 border border-slate-300 rounded-xl outline-none focus:bg-white focus:border-[#0068FF] focus:ring-2 focus:ring-blue-100"
-                />
-              </div>
-
-              {/* Guide / 3 Steps */}
-              <div className="p-3 bg-blue-50/70 border border-blue-200 rounded-xl text-xs space-y-1.5 text-blue-950 font-sans mt-auto">
-                <div className="font-bold font-mono text-[11px] text-blue-800 uppercase flex items-center gap-1.5">
-                  <span className="w-1.5 h-1.5 rounded-full bg-blue-600"></span>
-                  Hướng Dẫn Gửi Vào Zalo (3 Bước):
-                </div>
-                <div className="space-y-1 text-[11px] leading-relaxed text-blue-900">
-                  <p><strong>1.</strong> Bấm nút <strong>"Sao chép nội dung"</strong> ở trên.</p>
-                  <p><strong>2.</strong> Bấm <strong>"Mở Zalo Web"</strong> (hoặc mở ứng dụng Zalo trên máy tính).</p>
-                  <p><strong>3.</strong> Nhấn phím <strong>Ctrl + V</strong> để dán tin nhắn vào khung chat nhóm nhà máy.</p>
-                </div>
-              </div>
             </div>
 
-            {/* Right Column: Evidence Images & Download Tools (Cols 7) */}
-            <div className="lg:col-span-7 bg-white rounded-2xl border border-slate-200 shadow-xs p-4 sm:p-5 flex flex-col gap-4">
-              <div className="flex items-center justify-between border-b border-slate-100 pb-3">
-                <div className="flex items-center gap-2">
-                  <span className="w-6 h-6 rounded-md bg-slate-900 text-white flex items-center justify-center text-xs font-mono font-bold">
-                    02
-                  </span>
-                  <h3 className="font-extrabold text-xs sm:text-sm font-mono uppercase text-slate-800 flex items-center gap-1.5">
-                    <ImageIcon className="h-4 w-4 text-[#0068FF]" />
-                    <span>Hình Ảnh Minh Chứng Lỗi ({photoItems.length})</span>
-                  </h3>
-                </div>
+            {/* Preview text box */}
+            <pre className="font-mono text-xs bg-white border border-slate-300 rounded-lg p-2.5 text-slate-800 whitespace-pre-wrap leading-relaxed select-all">
+              {compactMessage}
+            </pre>
+          </div>
 
-                {photoItems.length > 0 && (
-                  <button
-                    type="button"
-                    onClick={handleDownloadAllZip}
-                    disabled={isDownloadingZip}
-                    className="text-xs font-mono font-bold text-emerald-700 hover:text-emerald-800 bg-emerald-50 hover:bg-emerald-100 px-3 py-1.5 rounded-lg border border-emerald-300 flex items-center gap-1.5 cursor-pointer transition-colors"
-                    title="Tải toàn bộ hình ảnh dạng tệp ZIP"
-                  >
-                    <Download className="h-3.5 w-3.5" />
-                    <span>{isDownloadingZip ? 'Đang nén ZIP...' : 'TẢI TOÀN BỘ ẢNH (ZIP)'}</span>
-                  </button>
-                )}
+          {/* 2. KHUNG HÌNH ẢNH MINH CHỨNG */}
+          {photoPreviews.length > 0 && (
+            <div className="space-y-2">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-mono font-bold text-slate-700 uppercase flex items-center gap-1.5">
+                  <ImageIcon className="h-3.5 w-3.5 text-[#0068FF]" />
+                  Hình ảnh kèm theo ({totalPhotos} ảnh):
+                </span>
+                <button
+                  type="button"
+                  onClick={handleDownloadAllPhotos}
+                  disabled={isDownloading}
+                  className="text-[11px] font-mono font-bold text-emerald-700 hover:text-emerald-800 bg-emerald-50 hover:bg-emerald-100 px-2.5 py-1 rounded-lg border border-emerald-200 flex items-center gap-1 cursor-pointer transition-colors"
+                  title="Tải tất cả ảnh về máy"
+                >
+                  <Download className="h-3 w-3" />
+                  <span>{isDownloading ? 'Đang nén...' : 'Tải bộ ảnh'}</span>
+                </button>
               </div>
 
-              {photoItems.length === 0 ? (
-                <div className="py-12 text-center text-slate-400 border border-dashed rounded-xl flex flex-col items-center justify-center gap-2">
-                  <ImageIcon className="h-10 w-10 text-slate-300" />
-                  <span className="text-xs font-mono">Báo cáo này chưa có hình ảnh đính kèm</span>
-                </div>
-              ) : (
-                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
-                  {photoItems.map((item) => (
-                    <div 
-                      key={item.index}
-                      className="bg-slate-900 border border-slate-300 rounded-xl overflow-hidden flex flex-col shadow-xs"
-                    >
-                      <div className="relative aspect-square w-full bg-slate-950 flex items-center justify-center">
-                        <img 
-                          src={item.previewUrl} 
-                          alt={`Ảnh #${item.index + 1}`} 
-                          className="w-full h-full object-cover"
-                          loading="lazy"
-                        />
-                        <span className="absolute top-1.5 left-1.5 bg-black/75 text-white font-mono text-[9px] px-1.5 py-0.5 rounded font-bold">
-                          #{item.index + 1}
-                        </span>
-                      </div>
+              {/* Lưới hình ảnh trực quan */}
+              <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5">
+                {photoPreviews.map((item) => (
+                  <div 
+                    key={item.index}
+                    className="bg-slate-900 border border-slate-300 rounded-xl overflow-hidden flex flex-col shadow-xs"
+                  >
+                    <div className="relative aspect-square w-full bg-slate-950 flex items-center justify-center">
+                      <img 
+                        src={item.previewUrl} 
+                        alt={`Ảnh ${item.index + 1}`} 
+                        className="w-full h-full object-cover"
+                        loading="lazy"
+                      />
+                      <span className="absolute top-1 left-1 bg-black/75 text-white font-mono text-[9px] px-1 py-0.5 rounded font-bold">
+                        #{item.index + 1}
+                      </span>
+                    </div>
 
-                      <div className="p-2 bg-slate-900 border-t border-slate-800 flex flex-col gap-1.5">
-                        <span className="text-[11px] font-mono font-bold text-amber-300 truncate" title={item.defectName}>
-                          {item.defectName || 'Lỗi kiểm định'}
-                        </span>
-
-                        <div className="grid grid-cols-2 gap-1.5 pt-0.5">
-                          <button
-                            type="button"
-                            onClick={() => handleCopyPhotoToClipboard(item)}
-                            className="bg-blue-600 hover:bg-blue-500 text-white text-[10px] font-mono font-bold py-1.5 px-1 rounded-md flex items-center justify-center gap-1 cursor-pointer transition-colors"
-                            title="Sao chép ảnh để dán (Ctrl+V) vào Zalo"
-                          >
-                            {copiedImageIdx === item.index ? (
-                              <Check className="h-3 w-3 text-emerald-300" />
-                            ) : (
-                              <Copy className="h-3 w-3" />
-                            )}
-                            <span>{copiedImageIdx === item.index ? 'Đã chép' : 'Chép ảnh'}</span>
-                          </button>
-
-                          <button
-                            type="button"
-                            onClick={() => handleDownloadSinglePhoto(item)}
-                            className="bg-slate-800 hover:bg-slate-700 text-slate-200 text-[10px] font-mono font-bold py-1.5 px-1 rounded-md flex items-center justify-center gap-1 cursor-pointer transition-colors border border-slate-700"
-                            title="Tải ảnh này về máy tính"
-                          >
-                            <Download className="h-3 w-3" />
-                            <span>Tải về</span>
-                          </button>
-                        </div>
+                    <div className="p-1.5 bg-slate-900 border-t border-slate-800 flex flex-col gap-1">
+                      <span className="text-[10px] font-mono font-bold text-amber-300 truncate text-center" title={item.defectName}>
+                        {item.defectName || 'Lỗi'}
+                      </span>
+                      
+                      <div className="grid grid-cols-2 gap-1 pt-0.5">
+                        <button
+                          type="button"
+                          onClick={() => handleCopySingleImage(item)}
+                          className="bg-blue-600 hover:bg-blue-500 text-white text-[10px] font-mono font-bold py-1 px-1 rounded flex items-center justify-center gap-1 cursor-pointer transition-colors"
+                          title="Sao chép ảnh để dán (Ctrl+V) vào Zalo"
+                        >
+                          {copiedImageIdx === item.index ? (
+                            <Check className="h-2.5 w-2.5" />
+                          ) : (
+                            <Copy className="h-2.5 w-2.5" />
+                          )}
+                          <span>{copiedImageIdx === item.index ? 'Đã chép' : 'Chép ảnh'}</span>
+                        </button>
+                        
+                        <button
+                          type="button"
+                          onClick={() => handleDownloadSingleImage(item)}
+                          className="bg-slate-800 hover:bg-slate-700 text-slate-200 text-[10px] font-mono font-bold py-1 px-1 rounded flex items-center justify-center gap-1 cursor-pointer transition-colors border border-slate-700"
+                          title="Tải ảnh này về máy"
+                        >
+                          <Download className="h-2.5 w-2.5" />
+                          <span>Tải về</span>
+                        </button>
                       </div>
                     </div>
-                  ))}
-                </div>
-              )}
-
-              {/* Direct Web Links at Bottom of Card */}
-              <div className="pt-3 border-t border-slate-100 flex flex-wrap items-center justify-between gap-3 mt-auto">
-                <div className="flex items-center gap-2 text-xs text-slate-600 font-mono">
-                  <span>PO hiện tại:</span>
-                  <strong className="text-slate-900 bg-slate-100 px-2 py-0.5 rounded border border-slate-200">
-                    {activeReport.order || 'Không có PO'}
-                  </strong>
-                </div>
-
-                <div className="flex items-center gap-2">
-                  <a
-                    href="https://chat.zalo.me/"
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="inline-flex items-center gap-1.5 bg-[#0068FF] hover:bg-[#0055d4] text-white text-xs font-mono font-bold py-2 px-3.5 rounded-lg shadow-2xs transition-colors cursor-pointer"
-                  >
-                    <ExternalLink className="h-3.5 w-3.5" />
-                    <span>MỞ ZALO WEB ĐỂ DÁN TIN</span>
-                  </a>
-                </div>
+                  </div>
+                ))}
               </div>
             </div>
+          )}
 
+          {/* Ghi chú thêm tùy chọn */}
+          <div className="space-y-1">
+            <input 
+              type="text"
+              value={customNote}
+              onChange={e => setCustomNote(e.target.value)}
+              placeholder="Thêm lời nhắn gửi kèm (tùy chọn)..."
+              className="w-full text-xs font-sans p-2 border border-slate-300 rounded-lg outline-none focus:border-[#0068FF] focus:ring-2 focus:ring-blue-100"
+            />
           </div>
-        )}
+        </div>
 
+        {/* Footer Actions */}
+        <div className="p-3.5 sm:p-4 bg-slate-50 border-t border-slate-200 flex flex-col sm:flex-row items-center gap-2 shrink-0">
+          <button
+            type="button"
+            onClick={handleNativeShare}
+            disabled={isSharing}
+            className="w-full sm:flex-1 bg-[#0068FF] hover:bg-[#0055d4] active:bg-[#0047b3] text-white font-extrabold text-xs sm:text-sm py-2.5 px-3 rounded-xl flex items-center justify-center gap-2 shadow-sm hover:shadow transition-all cursor-pointer border-none"
+            title="Mở ứng dụng Zalo để gửi tin nhắn kèm hình ảnh"
+          >
+            <Send className="h-4 w-4" />
+            <span>{isSharing ? 'Đang chuẩn bị...' : 'GỬI TRỰC TIẾP QUA ZALO'}</span>
+          </button>
+
+          <a
+            href="https://chat.zalo.me/"
+            target="_blank"
+            rel="noopener noreferrer"
+            onClick={() => handleCopyText()}
+            className="w-full sm:w-auto bg-white hover:bg-slate-100 active:bg-slate-200 border border-slate-300 text-slate-800 font-bold text-xs py-2.5 px-3 rounded-xl flex items-center justify-center gap-1.5 cursor-pointer transition-colors shadow-2xs"
+            title="Mở Zalo Web (chat.zalo.me)"
+          >
+            <ExternalLink className="h-3.5 w-3.5 text-[#0068FF]" />
+            <span>Mở Zalo Web</span>
+          </a>
+
+          <a
+            href="zalo://"
+            className="w-full sm:w-auto bg-blue-50 hover:bg-blue-100 text-[#0068FF] font-bold text-xs py-2.5 px-3 rounded-xl flex items-center justify-center gap-1.5 cursor-pointer transition-colors border border-blue-200"
+            title="Mở app Zalo máy tính"
+          >
+            <span>App Zalo</span>
+          </a>
+
+          <button
+            type="button"
+            onClick={handleCopyText}
+            className={`w-full sm:w-auto border text-xs font-bold py-2.5 px-3.5 rounded-xl flex items-center justify-center gap-1.5 cursor-pointer transition-all ${
+              copiedText 
+                ? 'bg-emerald-600 text-white border-emerald-600' 
+                : 'bg-white hover:bg-slate-100 border-slate-300 text-slate-700'
+            }`}
+          >
+            {copiedText ? <Check className="h-3.5 w-3.5" /> : <Copy className="h-3.5 w-3.5 text-slate-500" />}
+            <span>{copiedText ? 'ĐÃ CHÉP' : 'SAO CHÉP'}</span>
+          </button>
+        </div>
       </div>
     </div>
   );

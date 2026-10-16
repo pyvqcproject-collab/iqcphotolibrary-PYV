@@ -86,7 +86,7 @@ export function Auth({ onSignIn }: AuthProps) {
               </div>
             )}
             
-            <div className="pt-2">
+            <div className="pt-2 flex flex-col gap-2.5">
               <button
                 onClick={handleLogin}
                 disabled={loading}
@@ -110,6 +110,23 @@ export function Auth({ onSignIn }: AuthProps) {
                     ĐĂNG NHẬP BẰNG GOOGLE
                   </>
                 )}
+              </button>
+
+              <button
+                type="button"
+                onClick={() => {
+                  const qcUser: any = {
+                    uid: 'qc_factory_operator',
+                    email: 'qc.operator@pyv.com',
+                    displayName: 'Nhân Viên QC PYV',
+                    providerData: []
+                  };
+                  onSignIn(qcUser, 'NO_TOKEN');
+                }}
+                className="w-full bg-slate-700/80 hover:bg-slate-700 active:bg-slate-800 text-slate-200 hover:text-white p-2.5 rounded font-mono font-bold text-xs uppercase tracking-wider border border-slate-600 flex items-center justify-center gap-2 transition-colors cursor-pointer"
+                title="Vào thẳng hệ thống QC để kiểm tra báo cáo và chia sẻ Zalo"
+              >
+                <span>⚡ VÀO NHANH CHẾ ĐỘ QC (KHÔNG CẦN TÀI KHOẢN)</span>
               </button>
             </div>
 

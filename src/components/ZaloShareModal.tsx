@@ -56,9 +56,53 @@ interface ZaloShareModalProps {
   token?: string;
 }
 
+export type PartType = 'sole' | 'upper' | 'other';
+
+/**
+ * Phân loại bộ vị:
+ * - 'sole': Đế thô, Đế phun sơn, Phun sơn...
+ * - 'upper': Mặt giày...
+ * - 'other': Khác...
+ */
+export function getPartType(part?: string, subPart?: string): PartType {
+  const normPart = (part || '').toUpperCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim();
+  const normSub = (subPart || '').toUpperCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim();
+
+  // 1. Kiểm tra bộ vị chính
+  if (normPart.includes('MAT GIAY') || normPart.includes('UPPER') || normPart === 'MAT' || normPart.startsWith('MAT ')) {
+    return 'upper';
+  }
+  if (
+    normPart.includes('DE') || 
+    normPart.includes('PHUN SON') || 
+    normPart.includes('SON') || 
+    normPart.includes('SOLE') || 
+    normPart.includes('OUTSOLE')
+  ) {
+    return 'sole';
+  }
+
+  // 2. Kiểm tra thành phần nhỏ nếu bộ vị chính chưa xác định rõ
+  if (normSub.includes('MAT GIAY') || normSub.includes('UPPER')) {
+    return 'upper';
+  }
+  if (
+    normSub.includes('DE') || 
+    normSub.includes('PHUN SON') || 
+    normSub.includes('SON') || 
+    normSub.includes('SOLE') || 
+    normSub.includes('OUTSOLE')
+  ) {
+    return 'sole';
+  }
+
+  return 'sole';
+}
+
 /**
  * Tạo nội dung tin nhắn Zalo cực kỳ ngắn gọn, súc tích:
- * Chỉ gồm thông tin đơn hàng thiết yếu, KHÔNG chứa chuỗi base64 dài dòng, KHÔNG ký tự thừa!
+ * - Đế thô/ phun sơn: Chỉ hiện Hình thể, KHÔNG hiện màu (các thành phần khác giữ nguyên)
+ * - Mặt giày: Chỉ hiện Mã màu, KHÔNG hiện hình thể (các thành phần khác giữ nguyên)
  */
 export function buildZaloMessage(report: ZaloShareReportData, customNote?: string): string {
   const lines: string[] = [];
@@ -66,14 +110,22 @@ export function buildZaloMessage(report: ZaloShareReportData, customNote?: strin
   // 1. PO
   lines.push(`PO: ${report.order || 'Không có PO'}`);
 
-  // 2. Hình thể / Model (nếu có)
-  if (report.shoeModel) {
-    lines.push(`Hình thể: ${report.shoeModel}`);
-  }
-
-  // 3. Màu
-  if (report.colorCode) {
-    lines.push(`Màu: ${report.colorCode}`);
+  // 2. Hình thể / Mã màu theo quy tắc bộ vị:
+  // - Đế thô / phun sơn: Chỉ cần hiện hình thể, không hiện màu
+  // - Mặt giày: Chỉ cần hiện mã màu, không hiện hình thể
+  const partType = getPartType(report.part, report.subPart);
+  if (partType === 'sole') {
+    // Đế thô / phun sơn: Chỉ cần hiện hình thể, không hiện màu
+    const model = report.shoeModel || report.colorCode;
+    if (model) {
+      lines.push(`Hình thể: ${model}`);
+    }
+  } else {
+    // Mặt giày: Chỉ cần hiện mã màu, không hiện hình thể
+    const color = report.colorCode || report.shoeModel;
+    if (color) {
+      lines.push(`Mã màu: ${color}`);
+    }
   }
 
   // 4. Bộ vị

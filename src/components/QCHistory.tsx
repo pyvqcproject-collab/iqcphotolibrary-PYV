@@ -36,13 +36,28 @@ import {
   AlertTriangle,
   User as UserIcon,
   Copy,
-  Check
+  Check,
+  Camera,
+  UploadCloud,
+  Image as ImageIcon,
+  Box,
+  ChevronDown,
+  CheckCircle2,
+  Plus,
+  Filter
 } from 'lucide-react';
 import { format, parseISO } from 'date-fns';
 import * as ExcelJS from 'exceljs';
 import { saveAs } from '../lib/download';
 import JSZip from 'jszip';
 import { ZaloShareModal, ZaloIcon, ZaloShareReportData, buildZaloMessage, getPartType } from './ZaloShareModal';
+import { 
+  DEFAULT_SUB_PARTS,
+  SupplierModelMapping,
+  DEFAULT_SUPPLIER_MODELS,
+  DEFAULT_COLORS_LIST
+} from './AdminPanel';
+import { compressImage } from '../lib/image-compression';
 
 interface QCReport {
   id: string;
@@ -260,19 +275,45 @@ export const QCHistory = React.memo(function QCHistory({ user, token, userProfil
     return true;
   }, [selectedReport, isAdmin, userProfile, user]);
 
-  // Admin and standard editing/deleting states
+  // Edit Image Item definition
+  interface EditImageItem {
+    id: string;
+    source: string | File;
+    previewUrl: string;
+    isNew: boolean;
+    errorName: string;
+  }
+
+  // Admin and comprehensive editing states
   const [isEditing, setIsEditing] = useState(false);
   const [editDate, setEditDate] = useState('');
   const [editFloor, setEditFloor] = useState('');
+  const [editFloorOption, setEditFloorOption] = useState('');
+  const [editPart, setEditPart] = useState('ĐẾ THÔ');
+  const [editSubPart, setEditSubPart] = useState('');
+  const [editSubPartOption, setEditSubPartOption] = useState('');
   const [editOrder, setEditOrder] = useState('');
+  const [editIsNoPo, setEditIsNoPo] = useState(false);
   const [editShoeModel, setEditShoeModel] = useState('');
   const [editColorCode, setEditColorCode] = useState('');
-  const [editErrorName, setEditErrorName] = useState('');
   const [editSupplier, setEditSupplier] = useState('');
+  const [editSupplierOption, setEditSupplierOption] = useState('');
+  const [editSelectedErrors, setEditSelectedErrors] = useState<string[]>([]);
+  const [editErrorOption, setEditErrorOption] = useState('');
+  const [editCustomErrorInput, setEditCustomErrorInput] = useState('');
   const [editNote, setEditNote] = useState('');
-  const [editPart, setEditPart] = useState('');
-  const [editSubPart, setEditSubPart] = useState('');
+  const [editPhotos, setEditPhotos] = useState<EditImageItem[]>([]);
+  const [editTargetUploadError, setEditTargetUploadError] = useState('');
+  const [editShowModelDropdown, setEditShowModelDropdown] = useState(false);
+  const [editModelFilterQuery, setEditModelFilterQuery] = useState('');
+  const [editShowColorDropdown, setEditShowColorDropdown] = useState(false);
+  const [editColorFilterQuery, setEditColorFilterQuery] = useState('');
   const [isSavingEdit, setIsSavingEdit] = useState(false);
+  const [saveEditStatus, setSaveEditStatus] = useState('');
+  const [saveEditProgress, setSaveEditProgress] = useState(0);
+
+  const editCameraInputRef = useRef<HTMLInputElement>(null);
+  const editFileInputRef = useRef<HTMLInputElement>(null);
   
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
@@ -288,125 +329,460 @@ export const QCHistory = React.memo(function QCHistory({ user, token, userProfil
     setIsSavingEdit(false);
   }, [selectedReport?.id]);
 
+  // Dynamic configuration options for the edited report's part
+  const editConfig = useMemo(() => {
+    let key: 'detho' | 'deson' | 'matgiay' = 'detho';
+    const norm = (editPart || '').toUpperCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim();
+    if (norm.includes('MAT GIAY') || norm.includes('UPPER') || norm === 'MAT') {
+      key = 'matgiay';
+    } else if (norm.includes('PHUN SON') || norm.includes('SON')) {
+      key = 'deson';
+    } else {
+      key = 'detho';
+    }
+
+    let configData: any = {};
+    try {
+      const stored = localStorage.getItem('local_app_config');
+      if (stored) {
+        const full = JSON.parse(stored);
+        configData = full[key] || full['de'] || full;
+      }
+    } catch (_) {}
+
+    const floors: string[] = (configData.floors && configData.floors.length) 
+      ? configData.floors 
+      : (userProfile?.permittedFloors && userProfile.permittedFloors.length > 0 ? userProfile.permittedFloors : ['K63A', 'K63B', 'K73A', 'K73B']);
+    const suppliers: string[] = (configData.suppliers && configData.suppliers.length) 
+      ? configData.suppliers 
+      : ['JIA HOA', 'VĨNH TÀI', 'NỘI BỘ', 'KHÁC'];
+    const subParts: string[] = (configData.subParts && configData.subParts.length) 
+      ? configData.subParts 
+      : (DEFAULT_SUB_PARTS[key] || []);
+    const supplierModels: SupplierModelMapping[] = (configData.supplierModels && configData.supplierModels.length) 
+      ? configData.supplierModels 
+      : (DEFAULT_SUPPLIER_MODELS[key] || []);
+    const colors: string[] = (configData.colors && configData.colors.length) 
+      ? configData.colors 
+      : (DEFAULT_COLORS_LIST[key] || []);
+    const errors: string[] = (configData.errors && configData.errors.length) 
+      ? configData.errors 
+      : ['Vệ sinh', 'Quy cách', 'Kỹ thuật', 'Khác'];
+
+    return { key, floors, suppliers, subParts, supplierModels, colors, errors };
+  }, [editPart, userProfile]);
+
+  const editAvailableModels = useMemo(() => {
+    let list: string[] = [];
+    if (editConfig.supplierModels.length > 0) {
+      if (editSupplier && editSupplier !== 'KHÁC') {
+        list = editConfig.supplierModels
+          .filter(sm => sm.supplier.toUpperCase() === editSupplier.toUpperCase())
+          .map(sm => sm.model);
+      }
+      if (list.length === 0) {
+        list = Array.from(new Set(editConfig.supplierModels.map(sm => sm.model)));
+      }
+    }
+    if (list.length === 0) {
+      list = DEFAULT_SUPPLIER_MODELS[editConfig.key]?.map(sm => sm.model) || ['FCXV5', 'FCXV6', 'FCXV7'];
+    }
+    return Array.from(new Set(list));
+  }, [editConfig, editSupplier]);
+
+  const editAvailableColors = useMemo(() => {
+    let list: string[] = [...editConfig.colors];
+    if (list.length === 0) {
+      list = DEFAULT_COLORS_LIST['matgiay'] || [];
+    }
+    return Array.from(new Set(list));
+  }, [editConfig]);
+
+  const handleEditPartChange = (newPart: string) => {
+    setEditPart(newPart);
+    setEditSubPart('');
+    setEditSubPartOption('');
+    setEditShoeModel('');
+    setEditColorCode('');
+  };
+
+  const handleEditOrderChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const rawVal = e.target.value.toUpperCase();
+    const cleanNumeric = rawVal.replace(/[^0-9]/g, '');
+    const finalVal = cleanNumeric.slice(0, 15);
+    setEditOrder(finalVal);
+
+    if (finalVal.length >= 3) {
+      try {
+        const localMap = JSON.parse(localStorage.getItem('local_po_color_mappings') || '{}');
+        const matchedColor = localMap[finalVal];
+        if (matchedColor) {
+          const isSole = getPartType(editPart, editSubPart) === 'sole';
+          if (isSole) {
+            setEditShoeModel(matchedColor);
+            setEditColorCode('');
+          } else {
+            setEditColorCode(matchedColor);
+            setEditShoeModel('');
+          }
+          const matchedSm = editConfig.supplierModels.find(sm => sm.model.toUpperCase() === matchedColor.toUpperCase());
+          if (matchedSm && (!editSupplier || editSupplier === 'KHÁC')) {
+            setEditSupplier(matchedSm.supplier);
+            setEditSupplierOption(matchedSm.supplier);
+          }
+        }
+      } catch (_) {}
+    }
+  };
+
+  const handleEditToggleError = (err: string) => {
+    const trimmed = err.trim();
+    if (!trimmed) return;
+    if (editSelectedErrors.includes(trimmed)) {
+      setEditSelectedErrors(prev => prev.filter(e => e !== trimmed));
+    } else {
+      setEditSelectedErrors(prev => [...prev, trimmed]);
+    }
+  };
+
+  const handleEditAddError = (err: string) => {
+    const trimmed = err.trim();
+    if (!trimmed) return;
+    if (!editSelectedErrors.includes(trimmed)) {
+      setEditSelectedErrors(prev => [...prev, trimmed]);
+    }
+  };
+
+  const selectEditModel = (model: string) => {
+    setEditShoeModel(model);
+    setEditColorCode('');
+    setEditShowModelDropdown(false);
+    setEditModelFilterQuery('');
+    const matchedSm = editConfig.supplierModels.find(sm => sm.model.toUpperCase() === model.toUpperCase());
+    if (matchedSm && (!editSupplier || editSupplier === 'KHÁC')) {
+      setEditSupplier(matchedSm.supplier);
+      setEditSupplierOption(matchedSm.supplier);
+    }
+  };
+
+  const selectEditColor = (color: string) => {
+    setEditColorCode(color);
+    setEditShoeModel('');
+    setEditShowColorDropdown(false);
+    setEditColorFilterQuery('');
+  };
+
+  const handleEditFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files && e.target.files.length > 0) {
+      const fileArray = (Array.from(e.target.files) as File[]).filter((f: File) => f.type.startsWith('image/'));
+      if (fileArray.length > 0) {
+        const assignedError = editTargetUploadError || editSelectedErrors[0] || 'Lỗi chung';
+        const newItems: EditImageItem[] = fileArray.map((file: File, i: number) => ({
+          id: `new_${Date.now()}_${i}_${Math.random().toString(36).substring(2, 6)}`,
+          source: file,
+          previewUrl: URL.createObjectURL(file),
+          isNew: true,
+          errorName: assignedError
+        }));
+        setEditPhotos(prev => [...prev, ...newItems]);
+        setEditTargetUploadError('');
+      }
+      e.target.value = '';
+    }
+  };
+
+  const handleEditDropFiles = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
+      const fileArray = (Array.from(e.dataTransfer.files) as File[]).filter((f: File) => f.type.startsWith('image/'));
+      if (fileArray.length > 0) {
+        const assignedError = editTargetUploadError || editSelectedErrors[0] || 'Lỗi chung';
+        const newItems: EditImageItem[] = fileArray.map((file: File, i: number) => ({
+          id: `new_${Date.now()}_${i}_${Math.random().toString(36).substring(2, 6)}`,
+          source: file,
+          previewUrl: URL.createObjectURL(file),
+          isNew: true,
+          errorName: assignedError
+        }));
+        setEditPhotos(prev => [...prev, ...newItems]);
+        setEditTargetUploadError('');
+      }
+    }
+  };
+
+  const handleEditRemovePhoto = (photoId: string) => {
+    setEditPhotos(prev => {
+      const target = prev.find(p => p.id === photoId);
+      if (target && target.isNew && target.previewUrl.startsWith('blob:')) {
+        try { URL.revokeObjectURL(target.previewUrl); } catch (_) {}
+      }
+      return prev.filter(p => p.id !== photoId);
+    });
+  };
+
+  const handleEditChangePhotoError = (photoId: string, newError: string) => {
+    setEditPhotos(prev => prev.map(p => p.id === photoId ? { ...p, errorName: newError } : p));
+  };
+
+  const triggerEditUploadForError = (errName: string, source: 'camera' | 'file') => {
+    setEditTargetUploadError(errName);
+    if (source === 'camera') {
+      editCameraInputRef.current?.click();
+    } else {
+      editFileInputRef.current?.click();
+    }
+  };
+
   const startEditing = () => {
     if (!selectedReport || !isEditable) return;
-    setEditDate(selectedReport.date);
-    setEditFloor(selectedReport.floor);
-    setEditOrder(selectedReport.order);
-    setEditShoeModel(selectedReport.shoeModel || '');
-    setEditColorCode(selectedReport.colorCode);
-    setEditErrorName(selectedReport.errorName);
-    setEditSupplier(selectedReport.supplier);
+    const initialPart = selectedReport.part || 'ĐẾ THÔ';
+    setEditPart(initialPart);
+    setEditDate(selectedReport.date || format(new Date(), 'yyyy-MM-dd'));
+
+    const curFloor = selectedReport.floor || '';
+    setEditFloor(curFloor);
+    const floorsList = editConfig.floors || ['K63A', 'K63B', 'K73A', 'K73B'];
+    setEditFloorOption(curFloor && !floorsList.includes(curFloor) ? 'CUSTOM' : curFloor);
+
+    const curSubPart = selectedReport.subPart || '';
+    setEditSubPart(curSubPart);
+    const subPartsList = editConfig.subParts || [];
+    setEditSubPartOption(curSubPart && !subPartsList.includes(curSubPart) ? 'CUSTOM' : curSubPart);
+
+    const curOrder = selectedReport.order || '';
+    const isNoPo = curOrder === 'Không có PO' || curOrder === 'Không' || curOrder === 'KHÔNG';
+    setEditIsNoPo(isNoPo);
+    setEditOrder(isNoPo ? 'KHÔNG' : curOrder);
+
+    const isSole = getPartType(initialPart, curSubPart) === 'sole';
+    if (isSole) {
+      setEditShoeModel(selectedReport.shoeModel || selectedReport.colorCode || '');
+      setEditColorCode('');
+    } else {
+      setEditColorCode(selectedReport.colorCode || selectedReport.shoeModel || '');
+      setEditShoeModel('');
+    }
+
+    const curSupplier = selectedReport.supplier || '';
+    setEditSupplier(curSupplier);
+    const suppliersList = editConfig.suppliers || ['JIA HOA', 'VĨNH TÀI', 'NỘI BỘ', 'KHÁC'];
+    setEditSupplierOption(curSupplier && !suppliersList.includes(curSupplier) ? 'CUSTOM' : curSupplier);
+
     setEditNote(selectedReport.note || '');
-    setEditPart(selectedReport.part || '');
-    setEditSubPart(selectedReport.subPart || '');
+
+    let errorsList: string[] = [];
+    if (selectedReport.errorNames && selectedReport.errorNames.length > 0) {
+      errorsList = [...selectedReport.errorNames];
+    } else if (selectedReport.errorName) {
+      errorsList = selectedReport.errorName.split(',').map(s => s.trim()).filter(Boolean);
+    }
+    setEditSelectedErrors(errorsList);
+    setEditErrorOption('');
+    setEditCustomErrorInput('');
+
+    const initialPhotos: EditImageItem[] = (selectedReport.imageUrls || []).map((url, idx) => {
+      const defect = (selectedReport.imageErrors && selectedReport.imageErrors[idx])
+        || (selectedReport.errorNames && selectedReport.errorNames[idx])
+        || selectedReport.errorName
+        || errorsList[0]
+        || 'Lỗi chung';
+      return {
+        id: `existing_${idx}_${Date.now()}`,
+        source: url,
+        previewUrl: url,
+        isNew: false,
+        errorName: defect
+      };
+    });
+    setEditPhotos(initialPhotos);
+    setEditTargetUploadError('');
     setAdminActionError('');
+    setSaveEditStatus('');
+    setSaveEditProgress(0);
     setIsEditing(true);
   };
 
   const handleSaveEdit = async () => {
     if (!selectedReport || !isEditable) return;
-    const partType = getPartType(editPart || selectedReport.part, editSubPart || selectedReport.subPart);
+    const isSole = getPartType(editPart, editSubPart) === 'sole';
 
-    if (!editFloor.trim() || !editOrder.trim() || !editErrorName.trim() || !editSupplier.trim() || !editDate.trim()) {
-      setAdminActionError('Vui lòng nhập đầy đủ các trường bắt buộc.');
+    if (!editDate) {
+      setAdminActionError('Vui lòng chọn ngày báo cáo.');
       return;
     }
-
-    const finalShoeModel = partType === 'sole' 
-      ? (editShoeModel.trim() || editColorCode.trim())
-      : '';
-    const finalColorCode = partType === 'sole' 
-      ? '' 
-      : (editColorCode.trim() || editShoeModel.trim());
-
-    if (partType === 'sole' && !finalShoeModel) {
-      setAdminActionError('Vui lòng nhập hình thể cho bộ vị đế (đế thô/phun sơn).');
+    if (!editFloor.trim()) {
+      setAdminActionError('Vui lòng chọn hoặc nhập lầu / khu vực.');
       return;
     }
-    if (partType === 'upper' && !finalColorCode) {
-      setAdminActionError('Vui lòng nhập mã màu cho bộ vị mặt giày.');
+    if (!editPart.trim()) {
+      setAdminActionError('Vui lòng chọn bộ vị.');
+      return;
+    }
+    if (!editSubPart.trim()) {
+      setAdminActionError('Vui lòng chọn hoặc nhập thành phần nhỏ (chi tiết bộ vị).');
+      return;
+    }
+    if (!editOrder.trim() && !editIsNoPo) {
+      setAdminActionError("Vui lòng nhập mã đơn hàng (PO) hoặc tích 'Không có PO'.");
+      return;
+    }
+    const finalShoeModel = isSole ? (editShoeModel.trim() || editColorCode.trim()) : '';
+    const finalColorCode = isSole ? '' : (editColorCode.trim() || editShoeModel.trim());
+    if (isSole && !finalShoeModel) {
+      setAdminActionError('Vui lòng chọn hoặc nhập hình thể cho bộ vị đế.');
+      return;
+    }
+    if (!isSole && !finalColorCode) {
+      setAdminActionError('Vui lòng chọn hoặc nhập mã màu cho bộ vị mặt giày.');
+      return;
+    }
+    if (!editSupplier.trim()) {
+      setAdminActionError('Vui lòng chọn xưởng cung ứng.');
+      return;
+    }
+    if (editSelectedErrors.length === 0) {
+      setAdminActionError('Vui lòng chọn ít nhất 1 loại lỗi.');
+      return;
+    }
+    if (editPhotos.length === 0) {
+      setAdminActionError('Vui lòng đính kèm ít nhất 1 ảnh minh chứng lỗi.');
       return;
     }
 
     setIsSavingEdit(true);
+    setSaveEditStatus('Đang chuẩn bị lưu dữ liệu...');
+    setSaveEditProgress(15);
     setAdminActionError('');
+
     try {
+      const finalOrder = editIsNoPo ? 'Không có PO' : editOrder.trim();
+      const primaryError = editSelectedErrors[0];
+      const allErrors = editSelectedErrors;
+      const safePart = sanitizeName(editPart || 'Khong_Bo_Vi');
+      const safeSubPart = editSubPart ? sanitizeName(editSubPart) : '';
+      const safeOrder = sanitizeName(finalOrder);
+      const safeModel = finalShoeModel ? sanitizeName(finalShoeModel) : '';
+      const safeColor = sanitizeName(finalColorCode);
+      const safeSupplier = sanitizeName(editSupplier);
+      const safeFloor = sanitizeName(editFloor);
+      const partPrefix = safeSubPart ? `${safePart}_${safeSubPart}` : safePart;
+      const timestamp = Date.now();
+
+      const finalUrls: string[] = [];
+      const finalErrors: string[] = [];
+
+      const fileToBase64 = (blob: Blob): Promise<string> => {
+        return new Promise((resolve, reject) => {
+          const reader = new FileReader();
+          reader.onloadend = () => resolve(reader.result as string);
+          reader.onerror = reject;
+          reader.readAsDataURL(blob);
+        });
+      };
+
+      const withUploadTimeout = <T,>(promise: Promise<T>, ms: number): Promise<T> => {
+        let timeoutId: ReturnType<typeof setTimeout>;
+        const timeoutPromise = new Promise<T>((_, reject) => {
+          timeoutId = setTimeout(() => reject(new Error('Action timeout exceeded')), ms);
+        });
+        return Promise.race([promise, timeoutPromise]).finally(() => clearTimeout(timeoutId));
+      };
+
+      for (let i = 0; i < editPhotos.length; i++) {
+        const item = editPhotos[i];
+        const assignedErr = item.errorName || primaryError;
+        if (!item.isNew) {
+          // Existing photo
+          finalUrls.push(item.source as string);
+          finalErrors.push(assignedErr);
+        } else {
+          // Newly added photo: compress and upload
+          setSaveEditStatus(`Đang nén và tải lên ảnh mới #${i + 1}...`);
+          let blob: Blob = item.source as File;
+          try {
+            blob = await compressImage(item.source as File, 800, 800, 0.6);
+          } catch (_) {
+            blob = item.source as File;
+          }
+          const modelPart = safeModel ? `${safeModel}_` : '';
+          const specificError = sanitizeName(assignedErr);
+          const fileName = `${partPrefix}_${safeOrder}_${modelPart}${safeColor}_${specificError}_${safeSupplier}_${safeFloor}_edit_${i + 1}_${timestamp}.jpg`;
+          
+          let downloadUrl = '';
+          if (!navigator.onLine) {
+            downloadUrl = await fileToBase64(blob);
+          } else if (token === 'NO_TOKEN') {
+            try {
+              downloadUrl = await withUploadTimeout(uploadFileToStorage(blob, fileName), 60000);
+            } catch (_) {
+              downloadUrl = await fileToBase64(blob);
+            }
+          } else {
+            try {
+              downloadUrl = await withUploadTimeout(uploadFileToDrive(blob, fileName, token), 60000);
+            } catch (_) {
+              try {
+                downloadUrl = await withUploadTimeout(uploadFileToStorage(blob, fileName), 60000);
+              } catch (_) {
+                downloadUrl = await fileToBase64(blob);
+              }
+            }
+          }
+
+          finalUrls.push(downloadUrl);
+          finalErrors.push(assignedErr);
+        }
+
+        const pct = 15 + Math.round(((i + 1) / editPhotos.length) * 65);
+        setSaveEditProgress(pct);
+      }
+
+      setSaveEditStatus('Đang cập nhật cơ sở dữ liệu...');
+      setSaveEditProgress(85);
+
+      const updatedPayload: any = {
+        date: editDate,
+        floor: editFloor.trim(),
+        order: finalOrder,
+        shoeModel: finalShoeModel,
+        colorCode: finalColorCode,
+        errorName: allErrors.join(', '),
+        errorNames: allErrors,
+        imageErrors: finalErrors,
+        imageUrls: finalUrls,
+        supplier: editSupplier.trim(),
+        part: editPart,
+        subPart: editSubPart.trim(),
+        note: editNote.trim()
+      };
+
       if (selectedReport.isLocalOnly) {
-        // Edit local-only report
         const localJson = localStorage.getItem('local_qc_reports');
         if (localJson) {
           const parsed = JSON.parse(localJson) as any[];
           const updated = parsed.map((item) => {
             if (item.id === selectedReport.id) {
-              return {
-                ...item,
-                date: editDate,
-                floor: editFloor,
-                order: editOrder,
-                shoeModel: finalShoeModel,
-                colorCode: finalColorCode,
-                errorName: editErrorName,
-                supplier: editSupplier,
-                part: editPart,
-                subPart: editSubPart,
-                note: editNote
-              };
+              return { ...item, ...updatedPayload };
             }
             return item;
           });
           localStorage.setItem('local_qc_reports', JSON.stringify(updated));
         }
-
-        const updatedReport: QCReport = {
-          ...selectedReport,
-          date: editDate,
-          floor: editFloor,
-          order: editOrder,
-          shoeModel: finalShoeModel,
-          colorCode: finalColorCode,
-          errorName: editErrorName,
-          supplier: editSupplier,
-          part: editPart,
-          subPart: editSubPart,
-          note: editNote
-        };
-
-        setSelectedReport(updatedReport);
-        setReports(prev => prev.map(r => r.id === selectedReport.id ? updatedReport : r));
       } else {
-        // Update in Firestore
         const docRef = doc(db, 'qc_reports', selectedReport.id);
-        await updateDoc(docRef, {
-          date: editDate,
-          floor: editFloor,
-          order: editOrder,
-          shoeModel: finalShoeModel,
-          colorCode: finalColorCode,
-          errorName: editErrorName,
-          supplier: editSupplier,
-          part: editPart,
-          subPart: editSubPart,
-          note: editNote
-        });
-
-        const updatedReport: QCReport = {
-          ...selectedReport,
-          date: editDate,
-          floor: editFloor,
-          order: editOrder,
-          shoeModel: finalShoeModel,
-          colorCode: finalColorCode,
-          errorName: editErrorName,
-          supplier: editSupplier,
-          part: editPart,
-          subPart: editSubPart,
-          note: editNote
-        };
-
-        setSelectedReport(updatedReport);
-        setReports(prev => prev.map(r => r.id === selectedReport.id ? updatedReport : r));
+        await updateDoc(docRef, updatedPayload);
       }
+
+      const updatedReport: QCReport = {
+        ...selectedReport,
+        ...updatedPayload
+      };
+
+      setSelectedReport(updatedReport);
+      setReports(prev => prev.map(r => r.id === selectedReport.id ? updatedReport : r));
+      setSaveEditProgress(100);
+      setSaveEditStatus('Cập nhật biên bản thành công!');
       setIsEditing(false);
     } catch (err: any) {
       console.error("Failed to edit report:", err);
@@ -1839,180 +2215,33 @@ export const QCHistory = React.memo(function QCHistory({ user, token, userProfil
                 )}
 
                 {isEditing ? (
-                  /* EDITING FORM */
-                  <div className="space-y-4 bg-[#F8FAFC] p-4 rounded-xl border border-blue-200 animate-in slide-in-from-right-3 duration-200">
-                    <div className="flex items-center justify-between border-b border-slate-100 pb-2">
-                      <div className="flex items-center gap-1.5 text-blue-800 font-extrabold text-xs uppercase tracking-wider">
-                        <Pencil className="h-3.5 w-3.5 text-blue-600" />
-                        Chỉnh Sửa Biên Bản
-                      </div>
-                      <span className="text-[10px] font-mono text-slate-450 bg-slate-200 px-2 py-0.5 rounded">
-                        Mã: {selectedReport.id.substring(0, 8)}
-                      </span>
+                  <div className="bg-gradient-to-br from-blue-50 to-indigo-50/50 border border-blue-200 rounded-xl p-5 text-center space-y-3 shadow-xs animate-in zoom-in-95 duration-200">
+                    <div className="w-11 h-11 rounded-xl bg-blue-600 text-white flex items-center justify-center mx-auto shadow-sm">
+                      <Pencil className="h-5 w-5" />
                     </div>
-
-                    <div className="flex flex-col gap-1.5">
-                      <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider flex items-center gap-1">
-                        <Calendar className="h-3 w-3 text-slate-400" /> Ngày Báo Cáo
-                      </label>
-                      <input 
-                        type="date"
-                        value={editDate}
-                        onChange={e => setEditDate(e.target.value)}
-                        className="w-full p-2 bg-[#F8FAFC] border-transparent border rounded-xl hover:bg-slate-100 focus:bg-white focus:ring-4 focus:ring-blue-500/15 focus:border-blue-500 text-sm outline-none transition-all cursor-pointer font-bold text-slate-800"
-                      />
+                    <div>
+                      <h4 className="text-xs font-bold font-mono text-blue-950 uppercase">
+                        Đang Mở Bảng Chỉnh Sửa Toàn Diện
+                      </h4>
+                      <p className="text-[11px] text-blue-800 mt-1 leading-relaxed">
+                        Cửa sổ chỉnh sửa toàn diện (chuẩn giao diện tạo báo cáo) đang hiển thị trên màn hình.
+                      </p>
                     </div>
-
-                    <div className="flex flex-col gap-1.5">
-                      <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider flex items-center gap-1">
-                        <MapPin className="h-3 w-3 text-slate-400" /> Lầu / Khu Vực
-                      </label>
-                      <input 
-                        type="text"
-                        value={editFloor}
-                        onChange={e => setEditFloor(e.target.value)}
-                        className="w-full p-2 bg-[#F8FAFC] border-transparent border rounded-xl hover:bg-slate-100 focus:bg-white focus:ring-4 focus:ring-blue-500/15 focus:border-blue-500 text-sm outline-none transition-all text-slate-800 font-bold"
-                        placeholder="Nhập lầu hoặc khu vực..."
-                      />
-                    </div>
-                    <div className="flex flex-col gap-1.5">
-                      <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider flex items-center gap-1">
-                        <Layers className="h-3 w-3 text-slate-400" /> Bộ Vị
-                      </label>
-                      <input 
-                        type="text"
-                        value={editPart}
-                        onChange={e => setEditPart(e.target.value)}
-                        className="w-full p-2 bg-[#F8FAFC] border-transparent border rounded-xl hover:bg-slate-100 focus:bg-white focus:ring-4 focus:ring-blue-500/15 focus:border-blue-500 text-sm outline-none transition-all text-slate-800 font-bold"
-                        placeholder="Nhập bộ vị (Ví dụ: ĐẾ THÔ)..."
-                      />
-                    </div>
-
-                    <div className="flex flex-col gap-1.5">
-                      <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider flex items-center gap-1">
-                        <Layers className="h-3 w-3 text-slate-400" /> Thành Phần Nhỏ / Chi Tiết
-                      </label>
-                      <input 
-                        type="text"
-                        value={editSubPart}
-                        onChange={e => setEditSubPart(e.target.value)}
-                        className="w-full p-2 bg-[#F8FAFC] border-transparent border rounded-xl hover:bg-slate-100 focus:bg-white focus:ring-4 focus:ring-blue-500/15 focus:border-blue-500 text-sm outline-none transition-all text-slate-800 font-bold"
-                        placeholder="Nhập thành phần nhỏ (Ví dụ: Gót đế, Sơn viền, Lưỡi gà...)..."
-                      />
-                    </div>
-
-                    <div className="flex flex-col gap-1.5">
-                      <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider flex items-center gap-1 font-mono">
-                        <Tag className="h-3 w-3 text-slate-400" /> Đơn Hàng (PO)
-                      </label>
-                      <input 
-                        type="text"
-                        value={editOrder}
-                        onChange={e => setEditOrder(e.target.value)}
-                        className="w-full p-2 border border-slate-100 rounded-lg text-sm bg-white font-mono focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition-all font-bold text-slate-800"
-                        placeholder="Nhập mã đơn hàng..."
-                      />
-                    </div>
-
-                    {(() => {
-                      const currentEditPartType = getPartType(editPart || selectedReport.part, editSubPart || selectedReport.subPart);
-                      if (currentEditPartType === 'sole') {
-                        return (
-                          <div className="flex flex-col gap-1.5">
-                            <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider flex items-center gap-1 font-mono">
-                              <Tag className="h-3 w-3 text-slate-400" /> Hình Thể <span className="text-red-500">*</span>
-                            </label>
-                            <input 
-                              type="text"
-                              value={editShoeModel}
-                              onChange={e => {
-                                setEditShoeModel(e.target.value.toUpperCase());
-                                setEditColorCode('');
-                              }}
-                              className="w-full p-2 border border-slate-100 rounded-lg text-sm bg-white font-mono focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition-all font-bold text-slate-800 uppercase"
-                              placeholder="Nhập hình thể (VD: FCXV5)..."
-                            />
-                          </div>
-                        );
-                      } else {
-                        return (
-                          <div className="flex flex-col gap-1.5">
-                            <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider flex items-center gap-1 font-mono">
-                              <Layers className="h-3 w-3 text-slate-400" /> Mã Màu <span className="text-red-500">*</span>
-                            </label>
-                            <input 
-                              type="text"
-                              value={editColorCode}
-                              onChange={e => {
-                                setEditColorCode(e.target.value.toUpperCase());
-                                setEditShoeModel('');
-                              }}
-                              className="w-full p-2 border border-slate-100 rounded-lg text-sm bg-white font-mono focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition-all font-bold text-slate-800 uppercase"
-                              placeholder="Nhập mã màu (VD: MFCXVLI5)..."
-                            />
-                          </div>
-                        );
-                      }
-                    })()}
-
-                    <div className="flex flex-col gap-1.5">
-                      <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider flex items-center gap-1">
-                        <FileText className="h-3 w-3 text-slate-400" /> Tên Loại Lỗi
-                      </label>
-                      <input 
-                        type="text"
-                        value={editErrorName}
-                        onChange={e => setEditErrorName(e.target.value)}
-                        className="w-full p-2 bg-[#F8FAFC] border-transparent border rounded-xl hover:bg-slate-100 focus:bg-white focus:ring-4 focus:ring-blue-500/15 focus:border-blue-500 text-sm outline-none transition-all font-bold text-slate-805"
-                        placeholder="Nhập tên loại lỗi..."
-                      />
-                    </div>
-
-                    <div className="flex flex-col gap-1.5">
-                      <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider flex items-center gap-1">
-                        <Factory className="h-3 w-3 text-slate-400" /> Xưởng Cung Ứng
-                      </label>
-                      <input 
-                        type="text"
-                        value={editSupplier}
-                        onChange={e => setEditSupplier(e.target.value)}
-                        className="w-full p-2 bg-[#F8FAFC] border-transparent border rounded-xl hover:bg-slate-100 focus:bg-white focus:ring-4 focus:ring-blue-500/15 focus:border-blue-500 text-sm outline-none transition-all font-bold text-slate-805"
-                        placeholder="Nhập xưởng cung ứng..."
-                      />
-                    </div>
-                    
-                    <div className="flex flex-col gap-1.5">
-                      <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider flex items-center gap-1">
-                        <FileText className="h-3 w-3 text-slate-400" /> Ghi Chú Chi Tiết
-                      </label>
-                      <textarea 
-                        value={editNote}
-                        onChange={e => setEditNote(e.target.value)}
-                        rows={3}
-                        className="w-full p-2 bg-[#F8FAFC] border-transparent border rounded-xl hover:bg-slate-100 focus:bg-white focus:ring-4 focus:ring-blue-500/15 focus:border-blue-500 text-sm outline-none transition-all text-slate-800 resize-y"
-                        placeholder="Mô tả cụ thể vấn đề hoặc hướng xử lý..."
-                      />
-                    </div>
-
-                    <div className="flex gap-2.5 pt-2 border-t border-slate-100 mt-2">
+                    <div className="flex items-center justify-center gap-2 pt-1">
                       <button
                         type="button"
-                        onClick={handleSaveEdit}
-                        disabled={isSavingEdit}
-                        className="flex-1 bg-blue-600 hover:bg-blue-700 disabled:bg-blue-400 text-white font-extrabold text-xs py-2.5 px-3 rounded-xl active:scale-[0.98] flex items-center justify-center gap-1.5 cursor-pointer shadow border-none transition-all hover:scale-[1.01]"
+                        onClick={() => setIsEditing(true)}
+                        className="px-3.5 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs font-bold font-mono cursor-pointer shadow-xs transition-colors flex items-center gap-1.5"
                       >
-                        <Save className="h-4 w-4" />
-                        {isSavingEdit ? 'Đang lưu...' : 'LƯU THAY ĐỔI'}
+                        <Pencil className="h-3 w-3" />
+                        Mở Lại Cửa Sổ Chỉnh Sửa
                       </button>
-                      
                       <button
                         type="button"
                         onClick={() => { setIsEditing(false); setAdminActionError(''); }}
-                        disabled={isSavingEdit}
-                        className="bg-white hover:bg-slate-100 border border-slate-100 text-slate-700 font-extrabold text-xs py-2.5 px-3 rounded-lg flex items-center justify-center gap-1.5 cursor-pointer transition-all"
+                        className="px-3.5 py-1.5 bg-white hover:bg-slate-100 border border-slate-300 rounded-lg text-xs font-bold font-mono text-slate-700 cursor-pointer shadow-xs transition-colors"
                       >
-                        <Undo2 className="h-4 w-4 text-slate-500" />
-                        HỦY
+                        Đóng / Hủy
                       </button>
                     </div>
                   </div>
@@ -2435,6 +2664,939 @@ export const QCHistory = React.memo(function QCHistory({ user, token, userProfil
                 <ExternalLink className="h-4 w-4" />
                 Mở ảnh gốc trên Google Drive
               </a>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Comprehensive Edit Report Modal (Exact Form Experience as QC Creation) */}
+      {isEditing && selectedReport && (
+        <div className="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-xs flex items-center justify-center p-2 sm:p-4 md:p-6 overflow-y-auto animate-in fade-in duration-200">
+          <div 
+            className="bg-slate-100 rounded-xl shadow-2xl border border-slate-300 w-full max-w-6xl max-h-[96vh] flex flex-col overflow-hidden animate-in zoom-in-95 duration-200"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Modal Header */}
+            <div className="bg-slate-900 border-b border-slate-800 text-white p-3.5 sm:p-4 shrink-0 flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="w-9 h-9 rounded-lg bg-blue-600 text-white flex items-center justify-center shadow-xs shrink-0">
+                  <Pencil className="h-5 w-5" />
+                </div>
+                <div>
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <h3 className="text-sm sm:text-base font-bold font-mono uppercase tracking-wide">
+                      Chỉnh Sửa Toàn Diện Báo Cáo QC
+                    </h3>
+                    {selectedReport.isLocalOnly ? (
+                      <span className="text-[10px] font-mono font-bold text-amber-300 bg-amber-950/70 px-2 py-0.5 rounded border border-amber-600/50 flex items-center gap-1">
+                        <CloudOff className="h-3 w-3" /> LƯU TẠM
+                      </span>
+                    ) : (
+                      <span className="text-[10px] font-mono font-bold text-emerald-300 bg-emerald-950/70 px-2 py-0.5 rounded border border-emerald-600/50 flex items-center gap-1">
+                        <CheckCircle className="h-3 w-3" /> TRỰC TUYẾN
+                      </span>
+                    )}
+                  </div>
+                  <p className="text-[11px] text-slate-400 font-mono mt-0.5">
+                    Mã báo cáo: <span className="text-slate-300">{selectedReport.id}</span>
+                  </p>
+                </div>
+              </div>
+
+              <button
+                type="button"
+                onClick={() => {
+                  if (!isSavingEdit) {
+                    setIsEditing(false);
+                    setAdminActionError('');
+                  }
+                }}
+                disabled={isSavingEdit}
+                className="p-1.5 sm:px-3 sm:py-1.5 bg-slate-800 hover:bg-slate-700 active:bg-slate-600 text-slate-200 rounded-lg text-xs font-mono font-bold cursor-pointer border border-slate-700 flex items-center gap-1.5 transition-colors disabled:opacity-50"
+                title="Đóng cửa sổ chỉnh sửa"
+              >
+                <X className="h-4 w-4" />
+                <span className="hidden sm:inline">Đóng / Hủy</span>
+              </button>
+            </div>
+
+            {/* Modal Body */}
+            <div className="flex-1 overflow-y-auto p-4 sm:p-5 md:p-6 space-y-4">
+              {/* Error Alert */}
+              {adminActionError && (
+                <div className="rounded-lg bg-red-50 p-3.5 border border-red-200 text-xs text-red-900 font-semibold leading-relaxed flex items-start gap-2.5 shadow-xs animate-in fade-in duration-200">
+                  <AlertCircle className="h-4.5 w-4.5 text-red-600 shrink-0 mt-0.5" />
+                  <span>{adminActionError}</span>
+                </div>
+              )}
+
+              {/* 2-Column Grid Layout identical to QCForm */}
+              <div className="grid grid-cols-1 lg:grid-cols-12 gap-5 items-start">
+                
+                {/* CỘT 1 (lg:col-span-7): THÔNG TIN BIÊN BẢN */}
+                <section className="lg:col-span-7 bg-white rounded-lg border border-slate-200 shadow-xs p-4 sm:p-5 flex flex-col gap-4">
+                  <div className="border-b border-slate-200 pb-3 flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <span className="w-5 h-5 rounded bg-blue-600 text-white font-mono text-xs flex items-center justify-center font-bold">01</span>
+                      <h4 className="m-0 text-xs sm:text-sm font-bold text-slate-900 font-mono uppercase tracking-wider">Thông Tin Biên Bản (Chỉnh Sửa)</h4>
+                    </div>
+                    <span className="text-[11px] font-mono text-blue-800 font-bold bg-blue-50 px-2 py-0.5 rounded border border-blue-200">
+                      QUY TRÌNH CHUẨN
+                    </span>
+                  </div>
+
+                  {/* Hàng 1: Ngày kiểm & Bộ vị */}
+                  <div className="grid grid-cols-2 gap-3 text-xs">
+                    <div className="flex flex-col gap-1.5">
+                      <label className="text-[11px] font-bold text-slate-700 uppercase tracking-wider font-mono flex items-center gap-1">
+                        <Calendar className="h-3 w-3 text-slate-500" />
+                        <span>Ngày Kiểm <span className="text-red-500">*</span></span>
+                      </label>
+                      <input 
+                        type="date" 
+                        required 
+                        value={editDate} 
+                        onChange={e => setEditDate(e.target.value)}
+                        className="h-11 sm:h-10 px-3 bg-white border border-slate-300 rounded hover:border-slate-400 focus:bg-white focus:ring-1 focus:ring-blue-600 focus:border-blue-600 outline-none transition-all font-mono font-bold text-slate-900 text-sm cursor-pointer"
+                      />
+                    </div>
+                    
+                    <div className="flex flex-col gap-1.5">
+                      <label className="text-[11px] font-bold text-slate-700 uppercase tracking-wider font-mono flex items-center gap-1">
+                        <Layers className="h-3 w-3 text-slate-500" />
+                        <span>Bộ Vị <span className="text-red-500">*</span></span>
+                      </label>
+                      <select
+                        value={editPart}
+                        onChange={(e) => handleEditPartChange(e.target.value)}
+                        className="h-11 sm:h-10 px-3 bg-orange-50/60 border border-orange-300 rounded focus:bg-white focus:ring-1 focus:ring-blue-600 focus:border-blue-600 outline-none transition-all font-bold text-slate-900 text-sm w-full truncate cursor-pointer"
+                      >
+                        <option value="ĐẾ THÔ">ĐẾ THÔ</option>
+                        <option value="ĐẾ PHUN SƠN">ĐẾ PHUN SƠN</option>
+                        <option value="MẶT GIÀY">MẶT GIÀY</option>
+                      </select>
+                    </div>
+                  </div>
+
+                  {/* Thành phần nhỏ / Chi tiết bộ vị */}
+                  <div className="flex flex-col gap-1.5 text-xs">
+                    <div className="flex items-center justify-between">
+                      <label className="text-[11px] font-bold text-slate-700 uppercase tracking-wider font-mono">
+                        Thành phần nhỏ <span className="text-red-500">*</span>
+                      </label>
+                      <span className="text-[10px] text-slate-500 font-mono">
+                        {editSubPart ? `Đang chọn: ${editSubPart}` : 'Bắt buộc'}
+                      </span>
+                    </div>
+                    <select
+                      value={editSubPartOption}
+                      onChange={e => {
+                        const val = e.target.value;
+                        setEditSubPartOption(val);
+                        if (val !== 'CUSTOM' && val !== '') {
+                          setEditSubPart(val);
+                        } else if (val === 'CUSTOM') {
+                          setEditSubPart('');
+                        }
+                      }}
+                      className="w-full h-11 sm:h-10 px-3 bg-white border border-slate-300 rounded hover:border-slate-400 focus:bg-white focus:ring-1 focus:ring-blue-600 focus:border-blue-600 outline-none transition-all font-bold text-slate-900 text-sm cursor-pointer"
+                    >
+                      <option value="" disabled>-- Chọn thành phần nhỏ * --</option>
+                      {editConfig.subParts.map(sp => (
+                        <option key={sp} value={sp}>{sp}</option>
+                      ))}
+                      <option value="CUSTOM">➕ Tự nhập thành phần khác...</option>
+                    </select>
+
+                    {editSubPartOption === 'CUSTOM' && (
+                      <input
+                        type="text"
+                        required
+                        placeholder="Nhập tên thành phần nhỏ cụ thể (VD: Gót đế, Sơn viền, Lưỡi gà...)..."
+                        value={editSubPart}
+                        onChange={e => setEditSubPart(e.target.value)}
+                        className="h-11 sm:h-10 px-3 bg-orange-50/50 border border-orange-300 rounded focus:bg-white focus:ring-1 focus:ring-orange-500 focus:border-orange-500 outline-none transition-all font-bold text-slate-900 text-sm mt-1"
+                      />
+                    )}
+
+                    {/* Quick select chips for subParts */}
+                    {editConfig.subParts.length > 0 && (
+                      <div className="flex items-center gap-1.5 overflow-x-auto py-1 scrollbar-none">
+                        <span className="text-[10px] text-slate-400 font-mono uppercase shrink-0">GỢI Ý:</span>
+                        {editConfig.subParts.slice(0, 6).map(sp => (
+                          <button
+                            key={sp}
+                            type="button"
+                            onClick={() => { setEditSubPartOption(sp); setEditSubPart(sp); }}
+                            className={`text-xs font-semibold px-2.5 py-1 rounded border whitespace-nowrap transition-colors cursor-pointer shrink-0 ${
+                              editSubPart === sp 
+                                ? 'bg-blue-600 text-white border-blue-600 font-bold' 
+                                : 'bg-slate-100 hover:bg-blue-50 hover:text-blue-700 text-slate-700 border-slate-200'
+                            }`}
+                          >
+                            {sp}
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Lầu / Khu vực & Đơn hàng PO */}
+                  <div className="grid grid-cols-2 gap-3 text-xs">
+                    {/* Lầu / Khu vực */}
+                    <div className="flex flex-col gap-1.5">
+                      <label className="text-[11px] font-bold text-slate-700 uppercase tracking-wider font-mono flex items-center gap-1">
+                        <MapPin className="h-3 w-3 text-slate-500" />
+                        <span>Lầu / Khu vực <span className="text-red-500">*</span></span>
+                      </label>
+                      <select
+                        value={editFloorOption}
+                        onChange={e => {
+                          const val = e.target.value;
+                          setEditFloorOption(val);
+                          if (val !== 'CUSTOM' && val !== '') {
+                            setEditFloor(val);
+                          } else if (val === 'CUSTOM') {
+                            setEditFloor('');
+                          }
+                        }}
+                        className="h-11 sm:h-10 px-3 bg-white border border-slate-300 rounded hover:border-slate-400 focus:bg-white focus:ring-1 focus:ring-blue-600 focus:border-blue-600 outline-none transition-all font-bold text-slate-900 text-sm cursor-pointer"
+                      >
+                        <option value="" disabled>-- Chọn lầu * --</option>
+                        {editConfig.floors.map((fOpt) => (
+                          <option key={fOpt} value={fOpt}>{fOpt}</option>
+                        ))}
+                        <option value="CUSTOM">➕ Tự viết / Thêm lầu mới...</option>
+                      </select>
+                      
+                      {editFloorOption === 'CUSTOM' && (
+                        <input
+                          type="text"
+                          required
+                          placeholder="Nhập tên lầu mới..."
+                          value={editFloor}
+                          onChange={e => setEditFloor(e.target.value.toUpperCase())}
+                          className="mt-1 h-10 px-3 bg-orange-50/50 border border-orange-300 rounded focus:bg-white focus:ring-1 focus:ring-orange-500 focus:border-orange-500 outline-none transition-all font-bold text-slate-900 text-sm"
+                        />
+                      )}
+                    </div>
+
+                    {/* Đơn hàng PO */}
+                    <div className="flex flex-col gap-1.5">
+                      <div className="flex items-center justify-between">
+                        <label className="text-[11px] font-bold text-slate-700 uppercase tracking-wider font-mono">
+                          Đơn hàng PO <span className="text-red-500">*</span>
+                        </label>
+                        <label 
+                          className={`flex items-center gap-1 cursor-pointer px-1.5 py-0.5 rounded text-[11px] font-mono font-bold transition-all border ${
+                            editIsNoPo 
+                              ? 'bg-red-50 text-red-700 border-red-200' 
+                              : 'bg-slate-100 text-slate-600 border-slate-200 hover:bg-slate-200'
+                          }`}
+                        >
+                          <input 
+                            type="checkbox" 
+                            checked={editIsNoPo}
+                            onChange={e => {
+                              const checked = e.target.checked;
+                              setEditIsNoPo(checked);
+                              if (checked) {
+                                setEditOrder('KHÔNG');
+                              } else {
+                                setEditOrder('');
+                              }
+                            }}
+                            className="h-3.5 w-3.5 rounded text-red-600 focus:ring-red-500 border-slate-300 cursor-pointer"
+                          />
+                          <span>Không PO</span>
+                        </label>
+                      </div>
+                      <input 
+                        type="text" 
+                        required={!editIsNoPo}
+                        disabled={editIsNoPo}
+                        inputMode={editIsNoPo ? undefined : "numeric"}
+                        placeholder={editIsNoPo ? "KHÔNG CÓ PO" : "Số PO (VD: 123456) *"} 
+                        value={editOrder} 
+                        onChange={handleEditOrderChange}
+                        className={`h-11 sm:h-10 px-3 border rounded outline-none transition-all font-mono font-bold text-sm ${
+                          editIsNoPo 
+                            ? 'bg-slate-100 border-slate-200 text-slate-500 italic cursor-not-allowed' 
+                            : 'bg-white border-slate-300 hover:border-slate-400 focus:bg-white focus:ring-1 focus:ring-blue-600 focus:border-blue-600 text-slate-900'
+                        }`}
+                      />
+                    </div>
+                  </div>
+
+                  {/* Hình thể / Mã màu & Xưởng cung ứng */}
+                  <div className="grid grid-cols-2 gap-3 text-xs">
+                    {/* Quy tắc: Đế thô/ phun sơn -> CHỈ HIỆN HÌNH THỂ. Mặt giày -> CHỈ HIỆN MÃ MÀU */}
+                    {(() => {
+                      const isSole = getPartType(editPart, editSubPart) === 'sole';
+                      if (isSole) {
+                        return (
+                          <div className="flex flex-col gap-1.5 relative">
+                            <div className="flex items-center justify-between">
+                              <label className="text-[11px] font-bold text-slate-700 uppercase tracking-wider font-mono flex items-center gap-1">
+                                <Box className="h-3 w-3 text-blue-600" />
+                                <span>Hình thể <span className="text-red-500">*</span></span>
+                              </label>
+                              <span className="text-[10px] text-blue-700 font-mono font-semibold">
+                                [ĐẾ]
+                              </span>
+                            </div>
+                            <div className="relative">
+                              <input
+                                type="text"
+                                required
+                                value={editShoeModel}
+                                onChange={e => {
+                                  const val = e.target.value.toUpperCase();
+                                  setEditShoeModel(val);
+                                  setEditColorCode('');
+                                }}
+                                onFocus={() => setEditShowModelDropdown(true)}
+                                placeholder="NHẬP HÌNH THỂ (VD: FCXV5) *"
+                                className="w-full h-11 sm:h-10 px-3 bg-white border border-slate-300 rounded hover:border-slate-400 focus:bg-white focus:ring-1 focus:ring-blue-600 focus:border-blue-600 outline-none transition-all font-mono font-bold text-slate-900 text-sm uppercase pr-8"
+                              />
+                              <button
+                                type="button"
+                                onClick={() => setEditShowModelDropdown(!editShowModelDropdown)}
+                                className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 cursor-pointer p-1"
+                                title="Mở danh sách hình thể"
+                              >
+                                <ChevronDown className={`h-4 w-4 transition-transform ${editShowModelDropdown ? 'rotate-180' : ''}`} />
+                              </button>
+                            </div>
+
+                            {/* Dropdown list of models */}
+                            {editShowModelDropdown && (
+                              <>
+                                <div className="fixed inset-0 z-30" onClick={() => setEditShowModelDropdown(false)} />
+                                <div className="absolute top-full left-0 right-0 mt-1 bg-white border border-slate-300 rounded-lg shadow-xl z-40 p-2 space-y-1.5">
+                                  <div className="flex items-center justify-between pb-1 border-b border-slate-100">
+                                    <span className="text-[10px] font-bold font-mono text-slate-700 uppercase">
+                                      DANH SÁCH HÌNH THỂ {editSupplier ? `(${editSupplier})` : ''}
+                                    </span>
+                                    <button
+                                      type="button"
+                                      onClick={() => setEditShowModelDropdown(false)}
+                                      className="text-[10px] text-slate-400 hover:text-slate-700 font-mono font-bold cursor-pointer"
+                                    >
+                                      ĐÓNG ✕
+                                    </button>
+                                  </div>
+                                  <input
+                                    type="text"
+                                    value={editModelFilterQuery}
+                                    onChange={e => setEditModelFilterQuery(e.target.value)}
+                                    placeholder="Lọc nhanh (VD: FCXV5)..."
+                                    className="w-full p-2 text-xs font-mono font-semibold border border-slate-200 rounded outline-none focus:ring-1 focus:ring-blue-600 bg-slate-50 uppercase"
+                                    autoFocus
+                                  />
+                                  <div className="max-h-48 overflow-y-auto divide-y divide-slate-100">
+                                    {editAvailableModels
+                                      .filter(m => !editModelFilterQuery.trim() || m.toLowerCase().includes(editModelFilterQuery.toLowerCase()))
+                                      .map(m => (
+                                        <button
+                                          key={m}
+                                          type="button"
+                                          onClick={() => selectEditModel(m)}
+                                          className={`w-full text-left p-2 rounded text-xs font-mono font-bold flex items-center justify-between hover:bg-blue-50 transition-colors cursor-pointer ${editShoeModel === m ? 'text-blue-700 bg-blue-50 font-extrabold' : 'text-slate-800'}`}
+                                        >
+                                          <span>{m}</span>
+                                          {editShoeModel === m && <Check className="h-3.5 w-3.5 text-blue-600" />}
+                                        </button>
+                                      ))}
+                                  </div>
+                                </div>
+                              </>
+                            )}
+                          </div>
+                        );
+                      } else {
+                        return (
+                          <div className="flex flex-col gap-1.5 relative">
+                            <div className="flex items-center justify-between">
+                              <label className="text-[11px] font-bold text-slate-700 uppercase tracking-wider font-mono flex items-center gap-1">
+                                <Sparkles className="h-3 w-3 text-emerald-600" />
+                                <span>Mã màu <span className="text-red-500">*</span></span>
+                              </label>
+                              <span className="text-[10px] text-emerald-700 font-mono font-semibold">
+                                [MẶT GIÀY]
+                              </span>
+                            </div>
+                            <div className="relative">
+                              <input 
+                                type="text" 
+                                required 
+                                placeholder="NHẬP MÃ MÀU (VD: MFCXVLI5) *" 
+                                value={editColorCode} 
+                                onChange={e => {
+                                  const val = e.target.value.toUpperCase();
+                                  setEditColorCode(val);
+                                  setEditShoeModel('');
+                                }}
+                                onFocus={() => setEditShowColorDropdown(true)}
+                                className="w-full h-11 sm:h-10 px-3 bg-white border border-slate-300 rounded hover:border-slate-400 focus:bg-white focus:ring-1 focus:ring-emerald-600 focus:border-emerald-600 outline-none transition-all font-mono font-bold text-slate-900 uppercase text-sm pr-8" 
+                              />
+                              <button
+                                type="button"
+                                onClick={() => setEditShowColorDropdown(!editShowColorDropdown)}
+                                className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 cursor-pointer p-1"
+                                title="Mở danh sách mã màu"
+                              >
+                                <ChevronDown className={`h-4 w-4 transition-transform ${editShowColorDropdown ? 'rotate-180' : ''}`} />
+                              </button>
+                            </div>
+
+                            {/* Dropdown list for NHẬP MÃ MÀU */}
+                            {editShowColorDropdown && (
+                              <>
+                                <div className="fixed inset-0 z-30" onClick={() => setEditShowColorDropdown(false)} />
+                                <div className="absolute top-full left-0 right-0 mt-1 bg-white border border-slate-300 rounded-lg shadow-xl z-40 p-2 space-y-1.5">
+                                  <div className="flex items-center justify-between pb-1 border-b border-slate-100">
+                                    <span className="text-[10px] font-bold font-mono text-emerald-800 uppercase">
+                                      DANH SÁCH MÃ MÀU MẶT GIÀY
+                                    </span>
+                                    <button
+                                      type="button"
+                                      onClick={() => setEditShowColorDropdown(false)}
+                                      className="text-[10px] text-slate-400 hover:text-slate-700 font-mono font-bold cursor-pointer"
+                                    >
+                                      ĐÓNG ✕
+                                    </button>
+                                  </div>
+                                  <input
+                                    type="text"
+                                    value={editColorFilterQuery}
+                                    onChange={e => setEditColorFilterQuery(e.target.value)}
+                                    placeholder="Lọc nhanh (VD: MFCXVLI5)..."
+                                    className="w-full p-2 text-xs font-mono font-semibold border border-slate-200 rounded outline-none focus:ring-1 focus:ring-emerald-600 bg-slate-50 uppercase"
+                                    autoFocus
+                                  />
+                                  <div className="max-h-48 overflow-y-auto divide-y divide-slate-100">
+                                    {editAvailableColors
+                                      .filter(item => !editColorFilterQuery.trim() || item.toLowerCase().includes(editColorFilterQuery.toLowerCase()))
+                                      .map(item => (
+                                        <button
+                                          key={item}
+                                          type="button"
+                                          onClick={() => selectEditColor(item)}
+                                          className={`w-full text-left p-2 rounded text-xs font-mono font-bold flex items-center justify-between hover:bg-emerald-50 transition-colors cursor-pointer ${editColorCode === item ? 'text-emerald-700 bg-emerald-50 font-extrabold' : 'text-slate-800'}`}
+                                        >
+                                          <span>{item}</span>
+                                          {editColorCode === item && <Check className="h-3.5 w-3.5 text-emerald-600" />}
+                                        </button>
+                                      ))}
+                                  </div>
+                                </div>
+                              </>
+                            )}
+                          </div>
+                        );
+                      }
+                    })()}
+
+                    {/* Xưởng cung ứng */}
+                    <div className="flex flex-col gap-1.5">
+                      <label className="text-[11px] font-bold text-slate-700 uppercase tracking-wider font-mono flex items-center gap-1">
+                        <Factory className="h-3 w-3 text-slate-500" />
+                        <span>Xưởng cung ứng <span className="text-red-500">*</span></span>
+                      </label>
+                      <select
+                        value={editSupplierOption}
+                        onChange={e => {
+                          const val = e.target.value;
+                          setEditSupplierOption(val);
+                          if (val !== 'CUSTOM' && val !== '') {
+                            setEditSupplier(val);
+                          } else if (val === 'CUSTOM') {
+                            setEditSupplier('');
+                          }
+                        }}
+                        className="h-11 sm:h-10 px-3 bg-white border border-slate-300 rounded hover:border-slate-400 focus:bg-white focus:ring-1 focus:ring-blue-600 focus:border-blue-600 outline-none transition-all font-bold text-slate-900 text-sm cursor-pointer"
+                      >
+                        <option value="" disabled>-- Chọn xưởng * --</option>
+                        {editConfig.suppliers.map((supplierName) => (
+                          <option key={supplierName} value={supplierName}>{supplierName}</option>
+                        ))}
+                        <option value="CUSTOM">➕ Tự viết / Thêm xưởng mới...</option>
+                      </select>
+                      
+                      {editSupplierOption === 'CUSTOM' && (
+                        <input
+                          type="text"
+                          required
+                          placeholder="Nhập tên xưởng mới..."
+                          value={editSupplier}
+                          onChange={e => setEditSupplier(e.target.value.toUpperCase())}
+                          className="mt-1 h-10 px-3 bg-orange-50/50 border border-orange-300 rounded focus:bg-white focus:ring-1 focus:ring-orange-500 focus:border-orange-500 outline-none transition-all font-bold text-slate-900 text-sm"
+                        />
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Loại lỗi kỹ thuật: Multi-select & Add new */}
+                  <div className="flex flex-col gap-1.5 text-xs">
+                    <div className="flex items-center justify-between">
+                      <label className="text-[11px] font-bold text-slate-700 uppercase tracking-wider font-mono">
+                        Loại lỗi kỹ thuật <span className="text-red-500">*</span>
+                      </label>
+                      <span className="text-[10px] text-slate-500 font-mono">
+                        {editSelectedErrors.length > 0 ? (
+                          <span className="text-red-700 font-bold bg-red-50 border border-red-200 px-1.5 py-0.2 rounded">
+                            Đã chọn: {editSelectedErrors.length} lỗi
+                          </span>
+                        ) : (
+                          'Có thể chọn nhiều lỗi'
+                        )}
+                      </span>
+                    </div>
+
+                    {/* Selected Badges */}
+                    {editSelectedErrors.length > 0 && (
+                      <div className="flex flex-wrap items-center gap-1.5 p-2 bg-slate-50 border border-slate-200 rounded">
+                        {editSelectedErrors.map((err) => {
+                          const count = editPhotos.filter(p => p.errorName === err).length;
+                          return (
+                            <span
+                              key={err}
+                              className="inline-flex items-center gap-1 px-2 py-0.5 bg-red-50 text-red-800 border border-red-200 rounded text-xs font-bold font-mono"
+                            >
+                              <span className="w-1.5 h-1.5 rounded-full bg-red-600 shrink-0"></span>
+                              <span>{err}</span>
+                              <span className="text-[10px] bg-red-100 text-red-700 px-1 rounded font-normal" title={`${count} ảnh gán cho lỗi này`}>
+                                {count} ảnh
+                              </span>
+                              <button
+                                type="button"
+                                onClick={() => triggerEditUploadForError(err, 'camera')}
+                                className="inline-flex items-center gap-0.5 text-[10px] bg-red-200/80 hover:bg-red-300 text-red-900 px-1 py-0.5 rounded cursor-pointer transition-colors ml-0.5"
+                                title={`Chụp/tải ảnh riêng cho lỗi "${err}"`}
+                              >
+                                <Camera className="h-2.5 w-2.5" />
+                                <span>+Ảnh</span>
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => handleEditToggleError(err)}
+                                className="text-red-400 hover:text-red-700 ml-1 font-bold cursor-pointer"
+                                title="Bỏ chọn lỗi này"
+                              >
+                                ✕
+                              </button>
+                            </span>
+                          );
+                        })}
+                        <button
+                          type="button"
+                          onClick={() => setEditSelectedErrors([])}
+                          className="text-[10px] text-slate-400 hover:text-red-600 font-mono ml-auto self-center cursor-pointer underline"
+                        >
+                          Xóa hết
+                        </button>
+                      </div>
+                    )}
+
+                    <select
+                      value={editErrorOption}
+                      onChange={e => {
+                        const val = e.target.value;
+                        if (val === 'CUSTOM') {
+                          setEditErrorOption('CUSTOM');
+                        } else if (val) {
+                          handleEditAddError(val);
+                          setEditErrorOption('');
+                        }
+                      }}
+                      className="h-11 sm:h-10 px-3 bg-white border border-slate-300 rounded hover:border-slate-400 focus:bg-white focus:ring-1 focus:ring-blue-600 focus:border-blue-600 outline-none transition-all font-semibold text-slate-900 text-sm cursor-pointer"
+                    >
+                      <option value="">
+                        {editSelectedErrors.length > 0 ? '+ Chọn thêm lỗi khác vào báo cáo...' : '-- Chọn loại lỗi đang bị * --'}
+                      </option>
+                      {editConfig.errors.map((eName) => {
+                        const isPicked = editSelectedErrors.includes(eName);
+                        return (
+                          <option key={eName} value={eName} disabled={isPicked}>
+                            {isPicked ? `✓ ${eName} (Đã thêm)` : eName}
+                          </option>
+                        );
+                      })}
+                      <option value="CUSTOM">➕ Tự viết / Thêm tên lỗi mới...</option>
+                    </select>
+
+                    {editErrorOption === 'CUSTOM' && (
+                      <div className="flex gap-2 mt-1">
+                        <input
+                          type="text"
+                          placeholder="Nhập chi tiết tên lỗi kỹ thuật mới..."
+                          value={editCustomErrorInput}
+                          onChange={e => setEditCustomErrorInput(e.target.value)}
+                          onKeyDown={e => {
+                            if (e.key === 'Enter') {
+                              e.preventDefault();
+                              if (editCustomErrorInput.trim()) {
+                                handleEditAddError(editCustomErrorInput.trim());
+                                setEditCustomErrorInput('');
+                                setEditErrorOption('');
+                              }
+                            }
+                          }}
+                          className="flex-1 h-11 sm:h-10 px-3 border border-blue-400 rounded focus:ring-1 focus:ring-blue-600 outline-none transition-all font-semibold bg-blue-50/20 text-slate-900 text-sm"
+                          autoFocus
+                        />
+                        <button
+                          type="button"
+                          onClick={() => {
+                            if (editCustomErrorInput.trim()) {
+                              handleEditAddError(editCustomErrorInput.trim());
+                              setEditCustomErrorInput('');
+                              setEditErrorOption('');
+                            }
+                          }}
+                          className="px-3 bg-blue-600 hover:bg-blue-700 text-white font-mono font-bold text-xs rounded cursor-pointer shrink-0"
+                        >
+                          + THÊM LỖI
+                        </button>
+                      </div>
+                    )}
+
+                    {/* Quick chips for rapid error toggle */}
+                    {editConfig.errors.length > 0 && (
+                      <div className="flex items-center gap-1.5 overflow-x-auto py-1 scrollbar-none">
+                        <span className="text-[10px] text-slate-400 font-mono uppercase shrink-0">CHỌN NHANH:</span>
+                        {editConfig.errors.slice(0, 8).map(eName => {
+                          const isSelected = editSelectedErrors.includes(eName);
+                          return (
+                            <button
+                              key={eName}
+                              type="button"
+                              onClick={() => handleEditToggleError(eName)}
+                              className={`text-xs font-semibold px-2 py-0.5 rounded border whitespace-nowrap transition-colors cursor-pointer shrink-0 ${
+                                isSelected 
+                                  ? 'bg-red-50 text-red-700 border-red-300 font-bold' 
+                                  : 'bg-slate-100 hover:bg-blue-50 hover:text-blue-700 text-slate-700 border-slate-200'
+                              }`}
+                            >
+                              {isSelected ? `✓ ${eName}` : eName}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Ghi chú kiểm tra */}
+                  <div className="flex flex-col gap-1.5 text-xs">
+                    <label className="text-[11px] font-bold text-slate-700 uppercase tracking-wider font-mono">
+                      Ghi chú kiểm tra (Tùy chọn)
+                    </label>
+                    <textarea
+                      placeholder="Mô tả cụ thể vị trí lỗi, mức độ hoặc lưu ý xử lý nếu có..."
+                      value={editNote}
+                      onChange={e => setEditNote(e.target.value)}
+                      rows={2}
+                      className="p-3 bg-white border border-slate-300 rounded hover:border-slate-400 focus:bg-white focus:ring-1 focus:ring-blue-600 focus:border-blue-600 outline-none transition-all text-slate-900 text-sm resize-y min-h-[70px]"
+                    />
+                  </div>
+                </section>
+
+                {/* CỘT 2 (lg:col-span-5): MINH CHỨNG HÌNH ẢNH */}
+                <section className="lg:col-span-5 bg-white rounded-lg border border-slate-200 shadow-xs p-4 sm:p-5 flex flex-col gap-4">
+                  <div className="border-b border-slate-200 pb-3 flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <span className="w-5 h-5 rounded bg-slate-900 text-white font-mono text-xs flex items-center justify-center font-bold">02</span>
+                      <h4 className="m-0 text-xs sm:text-sm font-bold text-slate-900 font-mono uppercase tracking-wider">Minh Chứng Hình Ảnh Lỗi</h4>
+                    </div>
+                    <span className="text-[11px] font-mono text-slate-600 font-bold bg-slate-100 px-2 py-0.5 rounded border border-slate-200">
+                      {editPhotos.length} ẢNH
+                    </span>
+                  </div>
+
+                  {/* Bộ chọn / Tải ảnh riêng biệt cho từng lỗi */}
+                  {editSelectedErrors.length > 1 && (
+                    <div className="p-2.5 bg-slate-50 border border-slate-200 rounded-lg flex flex-col gap-1.5 shrink-0">
+                      <div className="flex items-center justify-between">
+                        <span className="text-[11px] font-mono font-bold text-slate-700 uppercase flex items-center gap-1">
+                          <Filter className="h-3 w-3 text-blue-600" />
+                          Gán ảnh cho lỗi:
+                        </span>
+                        {editTargetUploadError && (
+                          <button
+                            type="button"
+                            onClick={() => setEditTargetUploadError('')}
+                            className="text-[10px] text-slate-400 hover:text-slate-600 underline font-mono cursor-pointer"
+                          >
+                            Mặc định
+                          </button>
+                        )}
+                      </div>
+                      <div className="flex flex-wrap items-center gap-1.5">
+                        <button
+                          type="button"
+                          onClick={() => setEditTargetUploadError('')}
+                          className={`px-2 py-1 rounded text-xs font-mono font-bold transition-all cursor-pointer ${
+                            !editTargetUploadError
+                              ? 'bg-blue-600 text-white shadow-2xs'
+                              : 'bg-white text-slate-700 border border-slate-200 hover:bg-slate-100'
+                          }`}
+                        >
+                          Tất cả ({editPhotos.length})
+                        </button>
+                        {editSelectedErrors.map(err => {
+                          const count = editPhotos.filter(p => p.errorName === err).length;
+                          const isActive = editTargetUploadError === err;
+                          return (
+                            <button
+                              key={err}
+                              type="button"
+                              onClick={() => setEditTargetUploadError(err)}
+                              className={`px-2 py-1 rounded text-xs font-mono font-bold transition-all cursor-pointer flex items-center gap-1 ${
+                                isActive
+                                  ? 'bg-red-600 text-white shadow-2xs'
+                                  : 'bg-white text-red-800 border border-red-200 hover:bg-red-50'
+                              }`}
+                            >
+                              <span>{err}</span>
+                              <span className={`text-[10px] px-1 rounded-full font-bold ${isActive ? 'bg-red-700 text-white' : 'bg-red-100 text-red-700'}`}>
+                                {count}
+                              </span>
+                            </button>
+                          );
+                        })}
+                      </div>
+                      {editTargetUploadError && (
+                        <div className="text-[11px] text-red-700 font-mono flex items-center gap-1 pt-0.5">
+                          <span className="w-1.5 h-1.5 rounded-full bg-red-600 animate-pulse"></span>
+                          Ảnh chụp/tải tiếp theo sẽ gán cho lỗi: <strong className="underline">{editTargetUploadError}</strong>
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  {/* Nút chụp camera & Chọn file từ máy */}
+                  <div className="grid grid-cols-2 gap-2 shrink-0">
+                    <button
+                      type="button"
+                      onClick={() => editCameraInputRef.current?.click()}
+                      className="h-11 sm:h-10 px-3 bg-slate-900 hover:bg-slate-800 active:bg-black text-white font-mono font-bold text-xs uppercase tracking-wider rounded border border-slate-800 flex items-center justify-center gap-2 cursor-pointer transition-colors shadow-xs"
+                    >
+                      <Camera className="h-4 w-4 text-blue-400" />
+                      <span>Chụp Camera</span>
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => editFileInputRef.current?.click()}
+                      className="h-11 sm:h-10 px-3 bg-slate-100 hover:bg-slate-200 active:bg-slate-300 text-slate-800 font-mono font-bold text-xs uppercase tracking-wider rounded border border-slate-300 flex items-center justify-center gap-2 cursor-pointer transition-colors"
+                    >
+                      <ImageIcon className="h-4 w-4 text-slate-600" />
+                      <span>Chọn Từ Máy</span>
+                    </button>
+
+                    {/* Hidden Inputs */}
+                    <input
+                      type="file"
+                      accept="image/*"
+                      capture="environment"
+                      className="hidden"
+                      onChange={handleEditFileChange}
+                      ref={editCameraInputRef}
+                    />
+                    <input
+                      type="file"
+                      multiple
+                      accept="image/*"
+                      className="hidden"
+                      onChange={handleEditFileChange}
+                      ref={editFileInputRef}
+                    />
+                  </div>
+
+                  {/* Kéo thả ảnh Drop Zone */}
+                  <div
+                    onClick={() => editFileInputRef.current?.click()}
+                    onDragOver={(e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                    }}
+                    onDrop={handleEditDropFiles}
+                    className="border-2 border-dashed border-slate-300 hover:border-blue-500 bg-slate-50/70 hover:bg-blue-50/20 cursor-pointer rounded p-4 text-center transition-all shrink-0 select-none"
+                  >
+                    <div className="flex flex-col items-center justify-center space-y-1">
+                      <UploadCloud className="h-6 w-6 text-slate-400" />
+                      <div className="font-bold text-xs tracking-wider text-slate-700 uppercase font-mono">
+                        Kéo thả ảnh hoặc nhấn để tải thêm
+                      </div>
+                      <div className="text-[10px] text-slate-500 font-mono">
+                        {editTargetUploadError ? `Đang gán cho lỗi: ${editTargetUploadError} • ` : ''}Tự động nén HD tối ưu băng thông
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Thumbnail cards preview grid */}
+                  {editPhotos.length > 0 ? (
+                    <div className="overflow-y-auto min-h-[160px] max-h-[320px] pr-1">
+                      <div className="grid grid-cols-2 gap-2.5">
+                        {editPhotos.map((item, index) => (
+                          <div 
+                            key={item.id}
+                            className="relative bg-slate-900 border border-slate-200 rounded overflow-hidden shadow-xs flex flex-col group"
+                          >
+                            <div className="relative aspect-4/3 w-full bg-slate-950 flex items-center justify-center overflow-hidden">
+                              {item.isNew ? (
+                                <img 
+                                  src={item.previewUrl} 
+                                  alt="Preview" 
+                                  className="w-full h-full object-cover" 
+                                />
+                              ) : item.previewUrl.startsWith('data:image') ? (
+                                <img 
+                                  src={item.previewUrl} 
+                                  alt="Preview" 
+                                  className="w-full h-full object-cover" 
+                                />
+                              ) : (
+                                <DriveImage 
+                                  url={item.previewUrl} 
+                                  token={token} 
+                                  className="w-full h-full object-cover" 
+                                  alt={`Ảnh ${index + 1}`} 
+                                />
+                              )}
+
+                              {/* Index badge */}
+                              <div className="absolute top-1.5 left-1.5 bg-black/75 backdrop-blur-xs text-white font-mono text-[10px] px-1.5 py-0.5 rounded font-bold pointer-events-none">
+                                #{index + 1}
+                              </div>
+
+                              {/* Status badge: new vs existing */}
+                              <div className="absolute bottom-1.5 left-1.5 pointer-events-none">
+                                {item.isNew ? (
+                                  <span className="text-[9px] font-mono font-bold bg-amber-500 text-black px-1.5 py-0.5 rounded shadow">
+                                    ẢNH MỚI
+                                  </span>
+                                ) : (
+                                  <span className="text-[9px] font-mono font-bold bg-slate-800/90 text-slate-300 border border-white/20 px-1.5 py-0.5 rounded shadow">
+                                    ẢNH GỐC
+                                  </span>
+                                )}
+                              </div>
+
+                              {/* Delete button */}
+                              <button
+                                type="button"
+                                onClick={() => handleEditRemovePhoto(item.id)}
+                                className="absolute top-1.5 right-1.5 bg-red-600/90 hover:bg-red-700 text-white rounded p-1 shadow cursor-pointer border-none flex items-center justify-center z-10 transition-colors"
+                                title="Xóa ảnh này"
+                              >
+                                <X className="h-3.5 w-3.5" />
+                              </button>
+                            </div>
+
+                            {/* Tag assigned error dropdown footer */}
+                            <div className="p-2 bg-slate-900 border-t border-slate-800 flex flex-col gap-1 text-left">
+                              <div className="flex items-center justify-between gap-1">
+                                <span className="text-[10px] font-mono font-bold text-red-400 uppercase flex items-center gap-1 shrink-0">
+                                  <span className="w-1.5 h-1.5 rounded-full bg-red-500 shrink-0"></span>
+                                  Lỗi:
+                                </span>
+                                {editSelectedErrors.length > 0 ? (
+                                  <select
+                                    value={item.errorName}
+                                    onChange={e => handleEditChangePhotoError(item.id, e.target.value)}
+                                    className="text-[11px] font-mono font-bold bg-slate-800 text-amber-300 border border-slate-700 hover:border-amber-400 rounded px-1.5 py-0.5 outline-none cursor-pointer truncate max-w-[145px] transition-colors"
+                                    title="Đổi loại lỗi riêng cho hình ảnh này"
+                                  >
+                                    {editSelectedErrors.map(err => (
+                                      <option key={err} value={err}>
+                                        {err}
+                                      </option>
+                                    ))}
+                                    {!editSelectedErrors.includes(item.errorName) && (
+                                      <option value={item.errorName}>
+                                        {item.errorName}
+                                      </option>
+                                    )}
+                                  </select>
+                                ) : (
+                                  <span className="text-[11px] font-mono font-bold text-amber-300 truncate" title={item.errorName}>
+                                    {item.errorName || 'Lỗi chung'}
+                                  </span>
+                                )}
+                              </div>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="flex flex-col items-center justify-center py-8 text-center text-slate-400 border border-dashed border-slate-300 rounded bg-slate-50">
+                      <ImageIcon className="h-8 w-8 text-slate-300 mb-1" />
+                      <span className="text-xs font-mono font-bold text-slate-600">Chưa có ảnh nào được đính kèm</span>
+                      <span className="text-[10px] text-slate-400 mt-0.5">Yêu cầu tối thiểu 1 ảnh minh chứng lỗi để lưu</span>
+                    </div>
+                  )}
+                </section>
+              </div>
+            </div>
+
+            {/* Modal Footer / Progress & Action Buttons */}
+            <div className="bg-white border-t border-slate-200 p-3.5 sm:p-4 shrink-0 flex flex-col gap-3 shadow-xs">
+              {/* Progress bar during save */}
+              {isSavingEdit && (
+                <div className="space-y-1.5 animate-in fade-in duration-200">
+                  <div className="flex items-center justify-between text-xs font-mono font-bold text-blue-900">
+                    <span className="flex items-center gap-1.5">
+                      <RefreshCw className="h-3.5 w-3.5 animate-spin text-blue-600" />
+                      <span>{saveEditStatus || 'Đang cập nhật dữ liệu...'}</span>
+                    </span>
+                    <span>{saveEditProgress}%</span>
+                  </div>
+                  <div className="w-full bg-slate-100 rounded-full h-2 overflow-hidden border border-slate-200">
+                    <div 
+                      className="bg-blue-600 h-2 rounded-full transition-all duration-300"
+                      style={{ width: `${saveEditProgress}%` }}
+                    />
+                  </div>
+                </div>
+              )}
+
+              <div className="flex flex-col sm:flex-row items-center justify-end gap-2.5">
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (!isSavingEdit) {
+                      setIsEditing(false);
+                      setAdminActionError('');
+                    }
+                  }}
+                  disabled={isSavingEdit}
+                  className="w-full sm:w-auto px-5 py-2.5 bg-white hover:bg-slate-100 active:bg-slate-200 text-slate-700 font-mono font-bold text-xs uppercase tracking-wider rounded-lg border border-slate-300 cursor-pointer transition-colors disabled:opacity-50"
+                >
+                  HỦY BỎ
+                </button>
+
+                <button
+                  type="button"
+                  onClick={handleSaveEdit}
+                  disabled={isSavingEdit}
+                  className="w-full sm:w-auto px-6 py-2.5 bg-blue-600 hover:bg-blue-700 active:bg-blue-800 disabled:bg-blue-400 text-white font-mono font-bold text-xs uppercase tracking-wider rounded-lg shadow-sm flex items-center justify-center gap-2 cursor-pointer transition-all border border-blue-600 disabled:cursor-not-allowed"
+                >
+                  {isSavingEdit ? (
+                    <>
+                      <RefreshCw className="h-4 w-4 animate-spin" />
+                      <span>ĐANG LƯU DỮ LIỆU...</span>
+                    </>
+                  ) : (
+                    <>
+                      <Save className="h-4 w-4" />
+                      <span>LƯU CẬP NHẬT BIÊN BẢN</span>
+                    </>
+                  )}
+                </button>
+              </div>
             </div>
           </div>
         </div>

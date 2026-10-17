@@ -45,7 +45,7 @@ import {
   DEFAULT_SUPPLIER_MODELS,
   DEFAULT_COLORS_LIST
 } from './components/AdminPanel';
-import { ZaloShareModal, ZaloIcon, ZaloShareReportData } from './components/ZaloShareModal';
+import { ZaloShareModal, ZaloIcon, ZaloShareReportData, getPartType } from './components/ZaloShareModal';
 import { ZaloShareCenter } from './components/ZaloShareCenter';
 
 export interface DefectPhotoItem {
@@ -303,7 +303,10 @@ export function QCForm({ user, token, onLogout }: QCFormProps) {
   const checkIsSolePart = (partName: string) => {
     if (!partName) return true; // Default to sole if unselected
     const norm = partName.toUpperCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim();
-    return norm.includes('DE') || partName.toUpperCase().includes('ĐẾ');
+    if (norm.includes('MAT GIAY') || norm.includes('UPPER') || norm === 'MAT' || norm.startsWith('MAT ')) {
+      return false;
+    }
+    return norm.includes('DE') || partName.toUpperCase().includes('ĐẾ') || norm.includes('PHUN SON') || norm.includes('SON') || norm.includes('SOLE');
   };
 
   const parseColorsConfig = (colorsArray: string[]) => {
@@ -848,8 +851,8 @@ export function QCForm({ user, token, onLogout }: QCFormProps) {
   const selectModel = (model: string) => {
     setShoeModel(model);
     setShoeModelOption(model);
-    setColorCode(model);
-    setColorOption(model);
+    setColorCode('');
+    setColorOption('');
     const matchedSm = supplierModels.find(sm => sm.model.toUpperCase() === model.toUpperCase());
     if (matchedSm && (!supplier || supplier === 'KHÁC')) {
       setSupplier(matchedSm.supplier);
@@ -859,17 +862,21 @@ export function QCForm({ user, token, onLogout }: QCFormProps) {
   };
 
   const selectColor = (colorOrModel: string) => {
-    setColorCode(colorOrModel);
-    setColorOption(colorOrModel);
-    setShoeModel(colorOrModel);
-    setShoeModelOption(colorOrModel);
     if (isSolePart) {
+      setShoeModel(colorOrModel);
+      setShoeModelOption(colorOrModel);
+      setColorCode('');
+      setColorOption('');
       const matchedSm = supplierModels.find(sm => sm.model.toUpperCase() === colorOrModel.toUpperCase());
       if (matchedSm && (!supplier || supplier === 'KHÁC')) {
         setSupplier(matchedSm.supplier);
         setSupplierOption(matchedSm.supplier);
       }
     } else {
+      setColorCode(colorOrModel);
+      setColorOption(colorOrModel);
+      setShoeModel('');
+      setShoeModelOption('');
       const match = colorConfigList.find(c => c.colorCode.toUpperCase() === colorOrModel.toUpperCase());
       if (match && match.supplier && (!supplier || supplier === 'KHÁC')) {
         setSupplier(match.supplier);
@@ -893,9 +900,12 @@ export function QCForm({ user, token, onLogout }: QCFormProps) {
     // Search directly from local memory (sync loaded)
     const exactMatchColor = globalMappingsMap[order];
     if (exactMatchColor) {
-      setColorCode(exactMatchColor);
       if (isSolePart) {
         setShoeModel(exactMatchColor);
+        setColorCode('');
+      } else {
+        setColorCode(exactMatchColor);
+        setShoeModel('');
       }
       const matchedSm = supplierModels.find(sm => sm.model.toUpperCase() === exactMatchColor.toUpperCase());
       if (matchedSm && (!supplier || supplier === 'KHÁC')) {
@@ -1026,10 +1036,10 @@ export function QCForm({ user, token, onLogout }: QCFormProps) {
     }
     const effectiveModel = isSolePart
       ? (shoeModel.trim() || colorCode.trim())
-      : (shoeModel.trim() || colorCode.trim());
+      : '';
     const effectiveColor = isSolePart
-      ? (colorCode.trim() || shoeModel.trim())
-      : colorCode.trim();
+      ? ''
+      : (colorCode.trim() || shoeModel.trim());
 
     if (isSolePart) {
       if (!effectiveModel) {
@@ -1187,8 +1197,12 @@ export function QCForm({ user, token, onLogout }: QCFormProps) {
     // 1. Nếu form hiện tại đang có ảnh minh chứng HOẶC có số PO
     if (defectPhotos.length > 0 || (order && order.trim())) {
       const finalPart = currentPart || 'ĐẾ THÔ';
-      const effectiveModel = shoeModel.trim() || undefined;
-      const effectiveColor = colorCode.trim() || '';
+      const effectiveModel = isSolePart
+        ? (shoeModel.trim() || colorCode.trim() || undefined)
+        : undefined;
+      const effectiveColor = !isSolePart
+        ? (colorCode.trim() || shoeModel.trim() || '')
+        : '';
       const finalErrors = selectedErrors.length > 0 
         ? selectedErrors 
         : (errorName.trim() ? [errorName.trim()] : ['Chưa phân loại lỗi']);
@@ -1200,8 +1214,8 @@ export function QCForm({ user, token, onLogout }: QCFormProps) {
 
       const formReportData: ZaloShareReportData = {
         order: order.trim() || (isNoPo ? 'Không có PO' : 'Báo cáo QC'),
-        shoeModel: effectiveModel.trim() || undefined,
-        colorCode: effectiveColor.trim() || '',
+        shoeModel: effectiveModel,
+        colorCode: effectiveColor,
         errorName: finalErrors[0] || 'Lỗi',
         errorNames: finalErrors,
         imageErrors: reportImageErrors,
@@ -1241,15 +1255,17 @@ export function QCForm({ user, token, onLogout }: QCFormProps) {
     } catch (e) {}
 
     // 4. Mẫu báo cáo mặc định để người dùng xem và điền thêm
+    const finalPart = currentPart || 'ĐẾ THÔ';
+    const isSole = checkIsSolePart(finalPart);
     setZaloReport({
       order: isNoPo ? 'Không có PO' : 'Báo cáo QC',
-      shoeModel: shoeModel || undefined,
-      colorCode: colorCode || '',
+      shoeModel: isSole ? (shoeModel || undefined) : undefined,
+      colorCode: !isSole ? (colorCode || '') : '',
       errorName: 'Chưa phân loại lỗi',
       errorNames: [],
       supplier: supplier || '',
       floor: floor || '',
-      part: currentPart || 'ĐẾ THÔ',
+      part: finalPart,
       date: date || new Date().toISOString().split('T')[0],
       createdAt: new Date(),
       employeeName: userProfile?.name || '',
@@ -1824,7 +1840,7 @@ export function QCForm({ user, token, onLogout }: QCFormProps) {
                         onChange={e => {
                           const val = e.target.value.toUpperCase();
                           setShoeModel(val);
-                          setColorCode(val);
+                          setColorCode('');
                         }}
                         onFocus={() => setShowModelDropdown(true)}
                         placeholder="NHẬP HÌNH THỂ (VD: FCXV5) *"
@@ -1914,7 +1930,7 @@ export function QCForm({ user, token, onLogout }: QCFormProps) {
                         onChange={e => {
                           const val = e.target.value.toUpperCase();
                           setColorCode(val);
-                          setShoeModel(val);
+                          setShoeModel('');
                         }}
                         onFocus={() => setShowColorDropdown(true)}
                         className="w-full h-11 sm:h-10 px-3 bg-white border border-slate-300 rounded hover:border-slate-400 focus:bg-white focus:ring-1 focus:ring-emerald-600 focus:border-emerald-600 outline-none transition-all font-mono font-bold text-slate-900 uppercase text-sm pr-8" 

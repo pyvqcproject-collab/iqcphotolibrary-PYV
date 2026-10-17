@@ -2671,9 +2671,9 @@ export const QCHistory = React.memo(function QCHistory({ user, token, userProfil
 
       {/* Comprehensive Edit Report Modal (Exact Form Experience as QC Creation) */}
       {isEditing && selectedReport && (
-        <div className="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-xs flex items-center justify-center p-2 sm:p-4 md:p-6 overflow-y-auto animate-in fade-in duration-200">
+        <div className="fixed inset-0 z-[100] bg-slate-950/85 backdrop-blur-xs flex items-center justify-center p-0 sm:p-4 md:p-6 overflow-hidden animate-in fade-in duration-200">
           <div 
-            className="bg-slate-100 rounded-xl shadow-2xl border border-slate-300 w-full max-w-6xl max-h-[96vh] flex flex-col overflow-hidden animate-in zoom-in-95 duration-200"
+            className="bg-slate-100 sm:rounded-xl shadow-2xl border-0 sm:border border-slate-300 w-full max-w-6xl h-full sm:h-auto sm:max-h-[96vh] flex flex-col overflow-hidden animate-in zoom-in-95 duration-200"
             onClick={(e) => e.stopPropagation()}
           >
             {/* Modal Header */}
@@ -3543,16 +3543,16 @@ export const QCHistory = React.memo(function QCHistory({ user, token, userProfil
             </div>
 
             {/* Modal Footer / Progress & Action Buttons */}
-            <div className="bg-white border-t border-slate-200 p-3.5 sm:p-4 shrink-0 flex flex-col gap-3 shadow-xs">
+            <div className="bg-white border-t border-slate-200 p-3 sm:p-4 shrink-0 flex flex-col gap-2.5 shadow-xs pb-safe">
               {/* Progress bar during save */}
               {isSavingEdit && (
                 <div className="space-y-1.5 animate-in fade-in duration-200">
                   <div className="flex items-center justify-between text-xs font-mono font-bold text-blue-900">
-                    <span className="flex items-center gap-1.5">
-                      <RefreshCw className="h-3.5 w-3.5 animate-spin text-blue-600" />
-                      <span>{saveEditStatus || 'Đang cập nhật dữ liệu...'}</span>
+                    <span className="flex items-center gap-1.5 min-w-0">
+                      <RefreshCw className="h-3.5 w-3.5 animate-spin text-blue-600 shrink-0" />
+                      <span className="truncate">{saveEditStatus || 'Đang cập nhật dữ liệu...'}</span>
                     </span>
-                    <span>{saveEditProgress}%</span>
+                    <span className="shrink-0 ml-2">{saveEditProgress}%</span>
                   </div>
                   <div className="w-full bg-slate-100 rounded-full h-2 overflow-hidden border border-slate-200">
                     <div 
@@ -3563,7 +3563,7 @@ export const QCHistory = React.memo(function QCHistory({ user, token, userProfil
                 </div>
               )}
 
-              <div className="flex flex-col sm:flex-row items-center justify-end gap-2.5">
+              <div className="grid grid-cols-2 gap-2.5 w-full sm:w-auto sm:flex sm:items-center sm:justify-end">
                 <button
                   type="button"
                   onClick={() => {
@@ -3573,7 +3573,7 @@ export const QCHistory = React.memo(function QCHistory({ user, token, userProfil
                     }
                   }}
                   disabled={isSavingEdit}
-                  className="w-full sm:w-auto px-5 py-2.5 bg-white hover:bg-slate-100 active:bg-slate-200 text-slate-700 font-mono font-bold text-xs uppercase tracking-wider rounded-lg border border-slate-300 cursor-pointer transition-colors disabled:opacity-50"
+                  className="h-11 sm:h-10 px-4 bg-white hover:bg-slate-100 active:bg-slate-200 text-slate-700 font-mono font-bold text-xs uppercase tracking-wider rounded-lg border border-slate-300 cursor-pointer transition-colors disabled:opacity-50 flex items-center justify-center text-center"
                 >
                   HỦY BỎ
                 </button>
@@ -3582,17 +3582,17 @@ export const QCHistory = React.memo(function QCHistory({ user, token, userProfil
                   type="button"
                   onClick={handleSaveEdit}
                   disabled={isSavingEdit}
-                  className="w-full sm:w-auto px-6 py-2.5 bg-blue-600 hover:bg-blue-700 active:bg-blue-800 disabled:bg-blue-400 text-white font-mono font-bold text-xs uppercase tracking-wider rounded-lg shadow-sm flex items-center justify-center gap-2 cursor-pointer transition-all border border-blue-600 disabled:cursor-not-allowed"
+                  className="h-11 sm:h-10 px-5 bg-blue-600 hover:bg-blue-700 active:bg-blue-800 disabled:bg-blue-400 text-white font-mono font-bold text-xs uppercase tracking-wider rounded-lg shadow-sm flex items-center justify-center gap-1.5 cursor-pointer transition-all border border-blue-600 disabled:cursor-not-allowed text-center"
                 >
                   {isSavingEdit ? (
                     <>
-                      <RefreshCw className="h-4 w-4 animate-spin" />
-                      <span>ĐANG LƯU DỮ LIỆU...</span>
+                      <RefreshCw className="h-4 w-4 animate-spin shrink-0" />
+                      <span className="truncate">ĐANG LƯU...</span>
                     </>
                   ) : (
                     <>
-                      <Save className="h-4 w-4" />
-                      <span>LƯU CẬP NHẬT BIÊN BẢN</span>
+                      <Save className="h-4 w-4 shrink-0" />
+                      <span className="truncate">LƯU CẬP NHẬT</span>
                     </>
                   )}
                 </button>

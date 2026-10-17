@@ -42,7 +42,7 @@ import { format, parseISO } from 'date-fns';
 import * as ExcelJS from 'exceljs';
 import { saveAs } from '../lib/download';
 import JSZip from 'jszip';
-import { ZaloShareModal, ZaloIcon, ZaloShareReportData, buildZaloMessage } from './ZaloShareModal';
+import { ZaloShareModal, ZaloIcon, ZaloShareReportData, buildZaloMessage, getPartType } from './ZaloShareModal';
 
 interface QCReport {
   id: string;
@@ -306,8 +306,26 @@ export const QCHistory = React.memo(function QCHistory({ user, token, userProfil
 
   const handleSaveEdit = async () => {
     if (!selectedReport || !isEditable) return;
-    if (!editFloor.trim() || !editOrder.trim() || !editColorCode.trim() || !editErrorName.trim() || !editSupplier.trim() || !editDate.trim()) {
-      setAdminActionError('Vui lòng nhập đầy đủ tất cả thông tin.');
+    const partType = getPartType(editPart || selectedReport.part, editSubPart || selectedReport.subPart);
+
+    if (!editFloor.trim() || !editOrder.trim() || !editErrorName.trim() || !editSupplier.trim() || !editDate.trim()) {
+      setAdminActionError('Vui lòng nhập đầy đủ các trường bắt buộc.');
+      return;
+    }
+
+    const finalShoeModel = partType === 'sole' 
+      ? (editShoeModel.trim() || editColorCode.trim())
+      : '';
+    const finalColorCode = partType === 'sole' 
+      ? '' 
+      : (editColorCode.trim() || editShoeModel.trim());
+
+    if (partType === 'sole' && !finalShoeModel) {
+      setAdminActionError('Vui lòng nhập hình thể cho bộ vị đế (đế thô/phun sơn).');
+      return;
+    }
+    if (partType === 'upper' && !finalColorCode) {
+      setAdminActionError('Vui lòng nhập mã màu cho bộ vị mặt giày.');
       return;
     }
 
@@ -326,8 +344,8 @@ export const QCHistory = React.memo(function QCHistory({ user, token, userProfil
                 date: editDate,
                 floor: editFloor,
                 order: editOrder,
-                shoeModel: editShoeModel.trim(),
-                colorCode: editColorCode,
+                shoeModel: finalShoeModel,
+                colorCode: finalColorCode,
                 errorName: editErrorName,
                 supplier: editSupplier,
                 part: editPart,
@@ -345,8 +363,8 @@ export const QCHistory = React.memo(function QCHistory({ user, token, userProfil
           date: editDate,
           floor: editFloor,
           order: editOrder,
-          shoeModel: editShoeModel.trim(),
-          colorCode: editColorCode,
+          shoeModel: finalShoeModel,
+          colorCode: finalColorCode,
           errorName: editErrorName,
           supplier: editSupplier,
           part: editPart,
@@ -363,8 +381,8 @@ export const QCHistory = React.memo(function QCHistory({ user, token, userProfil
           date: editDate,
           floor: editFloor,
           order: editOrder,
-          shoeModel: editShoeModel.trim(),
-          colorCode: editColorCode,
+          shoeModel: finalShoeModel,
+          colorCode: finalColorCode,
           errorName: editErrorName,
           supplier: editSupplier,
           part: editPart,
@@ -377,8 +395,8 @@ export const QCHistory = React.memo(function QCHistory({ user, token, userProfil
           date: editDate,
           floor: editFloor,
           order: editOrder,
-          shoeModel: editShoeModel.trim(),
-          colorCode: editColorCode,
+          shoeModel: finalShoeModel,
+          colorCode: finalColorCode,
           errorName: editErrorName,
           supplier: editSupplier,
           part: editPart,
@@ -1525,16 +1543,42 @@ export const QCHistory = React.memo(function QCHistory({ user, token, userProfil
                         >
                           PO: {report.order || 'N/A'}
                         </button>
-                        {report.shoeModel && (
-                          <span className="font-bold text-teal-800 bg-teal-50 px-2 py-0.5 rounded border border-teal-200">
-                            HT: {report.shoeModel}
-                          </span>
-                        )}
-                        {report.colorCode && (
-                          <span className="font-bold text-indigo-800 bg-indigo-50 px-2 py-0.5 rounded border border-indigo-200">
-                            MÀU: {report.colorCode}
-                          </span>
-                        )}
+                        {(() => {
+                          const partType = getPartType(report.part, report.subPart);
+                          if (partType === 'sole') {
+                            // Đế thô/ phun sơn: Chỉ cần hiện hình thể, không hiện màu
+                            const modelVal = report.shoeModel || report.colorCode;
+                            return modelVal ? (
+                              <span className="font-bold text-teal-800 bg-teal-50 px-2 py-0.5 rounded border border-teal-200">
+                                HT: {modelVal}
+                              </span>
+                            ) : null;
+                          } else if (partType === 'upper') {
+                            // Mặt giày: Chỉ cần hiện mã màu, không hiện hình thể
+                            const colorVal = report.colorCode || report.shoeModel;
+                            return colorVal ? (
+                              <span className="font-bold text-indigo-800 bg-indigo-50 px-2 py-0.5 rounded border border-indigo-200">
+                                MÃ MÀU: {colorVal}
+                              </span>
+                            ) : null;
+                          } else {
+                            // Khác: giữ nguyên nếu có cả hai
+                            return (
+                              <>
+                                {report.shoeModel && (
+                                  <span className="font-bold text-teal-800 bg-teal-50 px-2 py-0.5 rounded border border-teal-200">
+                                    HT: {report.shoeModel}
+                                  </span>
+                                )}
+                                {report.colorCode && (
+                                  <span className="font-bold text-indigo-800 bg-indigo-50 px-2 py-0.5 rounded border border-indigo-200">
+                                    MÀU: {report.colorCode}
+                                  </span>
+                                )}
+                              </>
+                            );
+                          }
+                        })()}
                       </div>
                       
                       <div className="flex flex-wrap gap-x-3 gap-y-1 text-xs text-slate-500 font-mono">
@@ -1870,31 +1914,46 @@ export const QCHistory = React.memo(function QCHistory({ user, token, userProfil
                       />
                     </div>
 
-                    <div className="flex flex-col gap-1.5">
-                      <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider flex items-center gap-1 font-mono">
-                        <Tag className="h-3 w-3 text-slate-400" /> Hình Thể
-                      </label>
-                      <input 
-                        type="text"
-                        value={editShoeModel}
-                        onChange={e => setEditShoeModel(e.target.value.toUpperCase())}
-                        className="w-full p-2 border border-slate-100 rounded-lg text-sm bg-white font-mono focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition-all font-bold text-slate-800 uppercase"
-                        placeholder="Nhập hình thể..."
-                      />
-                    </div>
-
-                    <div className="flex flex-col gap-1.5">
-                      <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider flex items-center gap-1 font-mono">
-                        <Layers className="h-3 w-3 text-slate-400" /> Mã Màu
-                      </label>
-                      <input 
-                        type="text"
-                        value={editColorCode}
-                        onChange={e => setEditColorCode(e.target.value)}
-                        className="w-full p-2 border border-slate-100 rounded-lg text-sm bg-white font-mono focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition-all font-bold text-slate-805"
-                        placeholder="Nhập mã màu..."
-                      />
-                    </div>
+                    {(() => {
+                      const currentEditPartType = getPartType(editPart || selectedReport.part, editSubPart || selectedReport.subPart);
+                      if (currentEditPartType === 'sole') {
+                        return (
+                          <div className="flex flex-col gap-1.5">
+                            <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider flex items-center gap-1 font-mono">
+                              <Tag className="h-3 w-3 text-slate-400" /> Hình Thể <span className="text-red-500">*</span>
+                            </label>
+                            <input 
+                              type="text"
+                              value={editShoeModel}
+                              onChange={e => {
+                                setEditShoeModel(e.target.value.toUpperCase());
+                                setEditColorCode('');
+                              }}
+                              className="w-full p-2 border border-slate-100 rounded-lg text-sm bg-white font-mono focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition-all font-bold text-slate-800 uppercase"
+                              placeholder="Nhập hình thể (VD: FCXV5)..."
+                            />
+                          </div>
+                        );
+                      } else {
+                        return (
+                          <div className="flex flex-col gap-1.5">
+                            <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider flex items-center gap-1 font-mono">
+                              <Layers className="h-3 w-3 text-slate-400" /> Mã Màu <span className="text-red-500">*</span>
+                            </label>
+                            <input 
+                              type="text"
+                              value={editColorCode}
+                              onChange={e => {
+                                setEditColorCode(e.target.value.toUpperCase());
+                                setEditShoeModel('');
+                              }}
+                              className="w-full p-2 border border-slate-100 rounded-lg text-sm bg-white font-mono focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition-all font-bold text-slate-800 uppercase"
+                              placeholder="Nhập mã màu (VD: MFCXVLI5)..."
+                            />
+                          </div>
+                        );
+                      }
+                    })()}
 
                     <div className="flex flex-col gap-1.5">
                       <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider flex items-center gap-1">
@@ -1988,16 +2047,41 @@ export const QCHistory = React.memo(function QCHistory({ user, token, userProfil
                       </div>
 
                       <div className="flex divide-x divide-slate-200 col-span-2">
-                        {selectedReport.shoeModel && (
-                          <div className="p-2.5 flex-1 flex flex-col items-center justify-center text-center">
-                            <span className="text-[10px] text-slate-400 uppercase tracking-wider">HÌNH THỂ</span>
-                            <span className="font-bold text-teal-800 font-mono">{selectedReport.shoeModel}</span>
-                          </div>
-                        )}
-                        <div className="p-2.5 flex-1 flex flex-col items-center justify-center text-center">
-                          <span className="text-[10px] text-slate-400 uppercase tracking-wider">MÃ MÀU</span>
-                          <span className="font-bold text-indigo-800 font-mono">{selectedReport.colorCode || 'N/A'}</span>
-                        </div>
+                        {(() => {
+                          const partType = getPartType(selectedReport.part, selectedReport.subPart);
+                          if (partType === 'sole') {
+                            // Đế thô / phun sơn: Chỉ hiện hình thể, không hiện màu
+                            return (
+                              <div className="p-2.5 flex-1 flex flex-col items-center justify-center text-center">
+                                <span className="text-[10px] text-slate-400 uppercase tracking-wider">HÌNH THỂ</span>
+                                <span className="font-bold text-teal-800 font-mono">{selectedReport.shoeModel || selectedReport.colorCode || 'N/A'}</span>
+                              </div>
+                            );
+                          } else if (partType === 'upper') {
+                            // Mặt giày: Chỉ hiện mã màu, không hiện hình thể
+                            return (
+                              <div className="p-2.5 flex-1 flex flex-col items-center justify-center text-center">
+                                <span className="text-[10px] text-slate-400 uppercase tracking-wider">MÃ MÀU</span>
+                                <span className="font-bold text-indigo-800 font-mono">{selectedReport.colorCode || selectedReport.shoeModel || 'N/A'}</span>
+                              </div>
+                            );
+                          } else {
+                            return (
+                              <>
+                                {selectedReport.shoeModel && (
+                                  <div className="p-2.5 flex-1 flex flex-col items-center justify-center text-center">
+                                    <span className="text-[10px] text-slate-400 uppercase tracking-wider">HÌNH THỂ</span>
+                                    <span className="font-bold text-teal-800 font-mono">{selectedReport.shoeModel}</span>
+                                  </div>
+                                )}
+                                <div className="p-2.5 flex-1 flex flex-col items-center justify-center text-center">
+                                  <span className="text-[10px] text-slate-400 uppercase tracking-wider">MÃ MÀU</span>
+                                  <span className="font-bold text-indigo-800 font-mono">{selectedReport.colorCode || 'N/A'}</span>
+                                </div>
+                              </>
+                            );
+                          }
+                        })()}
                       </div>
                     </div>
 

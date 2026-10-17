@@ -16,7 +16,7 @@ import {
   RefreshCw,
   MessageSquare
 } from 'lucide-react';
-import { ZaloIcon, ZaloShareReportData, buildZaloMessage } from './ZaloShareModal';
+import { ZaloIcon, ZaloShareReportData, buildZaloMessage, getPartType } from './ZaloShareModal';
 import { saveAs } from '../lib/download';
 import JSZip from 'jszip';
 import { DriveImage } from './QCHistory';
@@ -399,6 +399,26 @@ export function ZaloShareCenter({
                       </div>
                       <div className="text-[11px] font-semibold text-red-600 truncate mt-1">
                         {report.errorName || 'Lỗi'}
+                      </div>
+                      <div className="flex items-center gap-1.5 mt-1 text-[10px] font-mono">
+                        {(() => {
+                          const partType = getPartType(report.part, report.subPart);
+                          if (partType === 'sole') {
+                            const val = report.shoeModel || report.colorCode;
+                            return val ? (
+                              <span className="font-bold text-teal-800 bg-teal-50 px-1.5 py-0.2 rounded border border-teal-200">
+                                HT: {val}
+                              </span>
+                            ) : null;
+                          } else {
+                            const val = report.colorCode || report.shoeModel;
+                            return val ? (
+                              <span className="font-bold text-indigo-800 bg-indigo-50 px-1.5 py-0.2 rounded border border-indigo-200">
+                                MÃ MÀU: {val}
+                              </span>
+                            ) : null;
+                          }
+                        })()}
                       </div>
                       <div className="text-[10px] text-slate-500 font-mono flex items-center justify-between mt-1">
                         <span>{report.floor || 'Xưởng'}</span>
